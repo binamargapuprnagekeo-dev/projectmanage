@@ -15,9 +15,10 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
   onClose,
 }) => {
   const SAVED_SHEET_URL_KEY = 'kurva_s_google_sheets_url';
+  const DEFAULT_SPREADSHEET_ID = '1R7pwxSWyPi5kh01kaI8OKXP5a7hHfGY2hBdBoiR2cIo';
 
   const [spreadsheetId, setSpreadsheetIdState] = useState<string>(() => {
-    return project.sheetsConfig?.spreadsheetId || localStorage.getItem(SAVED_SHEET_URL_KEY) || '';
+    return project.sheetsConfig?.spreadsheetId || localStorage.getItem(SAVED_SHEET_URL_KEY) || DEFAULT_SPREADSHEET_ID;
   });
 
   const setSpreadsheetId = (val: string) => {

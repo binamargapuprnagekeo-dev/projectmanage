@@ -38,14 +38,15 @@ export default function App() {
       console.warn('Gagal memuat project dari localStorage:', e);
     }
 
-    const savedSheetUrl = localStorage.getItem(SAVED_SHEET_URL_KEY);
+    const DEFAULT_SPREADSHEET_ID = '1R7pwxSWyPi5kh01kaI8OKXP5a7hHfGY2hBdBoiR2cIo';
+    const savedSheetUrl = localStorage.getItem(SAVED_SHEET_URL_KEY) || DEFAULT_SPREADSHEET_ID;
     if (savedSheetUrl) {
       initialProject = {
         ...initialProject,
         sheetsConfig: {
           ...initialProject.sheetsConfig,
           spreadsheetId: savedSheetUrl,
-          spreadsheetUrl: savedSheetUrl,
+          spreadsheetUrl: savedSheetUrl.includes('/d/') ? savedSheetUrl : `https://docs.google.com/spreadsheets/d/${savedSheetUrl}/edit`,
         },
       };
     }
