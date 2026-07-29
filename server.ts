@@ -130,7 +130,7 @@ Format JSON yang harus dihasilkan:
 // Proxy endpoint for Google Apps Script Web App (Server-to-Server Sync)
 app.post('/api/sheets-proxy', async (req, res) => {
   try {
-    const { scriptUrl, payload } = req.body;
+    const { scriptUrl, payload, method = 'POST' } = req.body;
     if (!scriptUrl || typeof scriptUrl !== 'string' || !scriptUrl.startsWith('https://script.google.com')) {
       return res.status(400).json({ error: 'URL Google Apps Script Web App tidak valid. Harus diawali dengan https://script.google.com' });
     }
@@ -145,40 +145,28 @@ app.post('/api/sheets-proxy', async (req, res) => {
       }
     }
 
-    let responseText = '';
-    let currentUrl = targetUrl;
-    let redirectsCount = 0;
+    const fetchOptions: RequestInit = {
+      method: method === 'GET' ? 'GET' : 'POST',
+      redirect: 'follow',
+    };
 
-    // Manually follow up to 5 redirects to keep POST method and body
-    while (redirectsCount < 5) {
-      const response = await fetch(currentUrl, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify(payload),
-        redirect: 'manual',
-      });
-
-      if ([301, 302, 303, 307, 308].includes(response.status)) {
-        const redirectLocation = response.headers.get('location');
-        if (redirectLocation) {
-          currentUrl = redirectLocation;
-          redirectsCount++;
-          continue;
-        }
-      }
-
-      responseText = await response.text();
-      break;
+    if (method !== 'GET') {
+      fetchOptions.headers = {
+        'Content-Type': 'text/plain;charset=utf-8',
+      };
+      fetchOptions.body = JSON.stringify(payload || {});
     }
 
+    // Send request with automatic redirect handling
+    const response = await fetch(targetUrl, fetchOptions);
+    const responseText = await response.text();
+
+    // Check if redirected to Google Login page
     if (
-      responseText.includes('<!DOCTYPE html>') ||
-      responseText.includes('Google Accounts') ||
-      responseText.includes('accounts.google.com') ||
-      responseText.includes('Sign in') ||
+      response.url.includes('accounts.google.com') ||
+      response.url.includes('ServiceLogin') ||
+      (responseText.includes('<!DOCTYPE html>') && responseText.includes('Google Accounts')) ||
+      responseText.includes('Sign in to continue') ||
       responseText.includes('ServiceLogin')
     ) {
       return res.status(400).json({
@@ -196,7 +184,7 @@ app.post('/api/sheets-proxy', async (req, res) => {
 
     if (jsonResult && jsonResult.status === 'error') {
       return res.status(400).json({
-        error: jsonResult.message || 'Google Apps Script mengembalikan pesan error saat menyimpan data.',
+        error: jsonResult.message || 'Google Apps Script mengembalikan pesan error saat memproses data.',
       });
     }
 

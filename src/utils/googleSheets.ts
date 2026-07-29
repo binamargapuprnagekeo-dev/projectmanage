@@ -321,18 +321,37 @@ export async function importFromGoogleSheets(
 
   let rows: string[][] = [];
 
-  // Try 1: Public CSV Export endpoint (No OAuth or API Key required!)
-  try {
-    const csvUrl = `https://docs.google.com/spreadsheets/d/${cleanId}/gviz/tq?tqx=out:csv`;
-    const csvRes = await fetch(csvUrl);
-    if (csvRes.ok) {
-      const csvText = await csvRes.text();
-      if (csvText && !csvText.includes('<!DOCTYPE html>')) {
-        rows = parseCSV(csvText);
+  // Try 0: If Google Apps Script Web App URL is provided
+  if (cleanId.startsWith('https://script.google.com')) {
+    try {
+      const proxyRes = await fetch('/api/sheets-proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scriptUrl: cleanId, method: 'GET' }),
+      });
+      const proxyData = await proxyRes.json();
+      if (proxyData.success && proxyData.result && Array.isArray(proxyData.result.values)) {
+        rows = proxyData.result.values;
       }
+    } catch (err) {
+      console.warn('Apps script import failed:', err);
     }
-  } catch (err) {
-    console.warn('Public CSV fetch failed, trying API fallback...', err);
+  }
+
+  // Try 1: Public CSV Export endpoint (No OAuth or API Key required!)
+  if (rows.length === 0 && !cleanId.startsWith('https://script.google.com')) {
+    try {
+      const csvUrl = `https://docs.google.com/spreadsheets/d/${cleanId}/gviz/tq?tqx=out:csv`;
+      const csvRes = await fetch(csvUrl);
+      if (csvRes.ok) {
+        const csvText = await csvRes.text();
+        if (csvText && !csvText.includes('<!DOCTYPE html>')) {
+          rows = parseCSV(csvText);
+        }
+      }
+    } catch (err) {
+      console.warn('Public CSV fetch failed, trying API fallback...', err);
+    }
   }
 
   // Try 2: Google Sheets API v4 fallback (if public fetch failed or returned HTML)
