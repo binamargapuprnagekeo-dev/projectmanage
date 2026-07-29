@@ -362,10 +362,29 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  const code = `function doPost(e) {
+                  const code = `function getTargetSheet(data) {
   try {
-    var data = JSON.parse(e.postData.contents);
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (ss) return ss.getActiveSheet();
+  } catch(e) {}
+  
+  var targetId = (data && data.spreadsheetId) ? data.spreadsheetId : "1R7pwxSWyPi5kh01kaI8OKXP5a7hHfGY2hBdBoiR2cIo";
+  if (targetId.indexOf("/d/") !== -1) {
+    targetId = targetId.split("/d/")[1].split("/")[0];
+  }
+  try {
+    var ss = SpreadsheetApp.openById(targetId);
+    if (ss) return ss.getSheets()[0];
+  } catch(e) {}
+
+  throw new Error("Spreadsheet tidak ditemukan. Pastikan ID Spreadsheet valid.");
+}
+
+function doPost(e) {
+  try {
+    var contents = (e && e.postData && e.postData.contents) ? e.postData.contents : "{}";
+    var data = JSON.parse(contents);
+    var sheet = getTargetSheet(data);
     sheet.clear();
     var values = data.values;
     if (values && values.length > 0) {
@@ -396,7 +415,7 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
 
 function doGet(e) {
   try {
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    var sheet = getTargetSheet({});
     var values = sheet.getDataRange().getValues();
     return ContentService.createTextOutput(JSON.stringify({ status: "success", values: values }))
       .setMimeType(ContentService.MimeType.JSON);

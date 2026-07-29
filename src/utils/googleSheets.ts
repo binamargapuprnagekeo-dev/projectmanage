@@ -242,7 +242,14 @@ export async function exportToGoogleSheets(
     const proxyRes = await fetch('/api/sheets-proxy', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ scriptUrl, payload: { values: normalizedValues, title: project.title } }),
+      body: JSON.stringify({
+        scriptUrl,
+        payload: {
+          values: normalizedValues,
+          title: project.title,
+          spreadsheetId: '1R7pwxSWyPi5kh01kaI8OKXP5a7hHfGY2hBdBoiR2cIo',
+        },
+      }),
     });
 
     const proxyData = await proxyRes.json().catch(() => ({}));
