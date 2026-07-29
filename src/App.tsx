@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { ProjectInfo, ScheduleItem, Category, UserRole, GoogleSheetsConfig } from './types/schedule';
 import { sampleProjectPicu, sampleProjectCleanroom, emptyCleanProject } from './data/sampleProjects';
 import {
@@ -6,6 +6,7 @@ import {
   calculateWeekSummaries,
   autoDistributeWeeklyPlan,
 } from './utils/calculator';
+import { exportToGoogleSheets } from './utils/googleSheets';
 
 import { Header } from './components/Header';
 import { ProjectInfoBanner } from './components/ProjectInfoBanner';
@@ -22,8 +23,41 @@ import { GoogleSheetsSyncModal } from './components/GoogleSheetsSyncModal';
 import { ConsultantNoteModal } from './components/ConsultantNoteModal';
 import { ChecklistModal } from './components/ChecklistModal';
 
+const LOCAL_STORAGE_PROJECT_KEY = 'kurva_s_project_data_v2';
+const SAVED_SHEET_URL_KEY = 'kurva_s_google_sheets_url';
+
 export default function App() {
-  const [project, setProject] = useState<ProjectInfo>(emptyCleanProject);
+  const [project, setProject] = useState<ProjectInfo>(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_PROJECT_KEY);
+      const savedSheetUrl = localStorage.getItem(SAVED_SHEET_URL_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (savedSheetUrl) {
+          parsed.sheetsConfig = {
+            ...parsed.sheetsConfig,
+            spreadsheetId: savedSheetUrl,
+            spreadsheetUrl: savedSheetUrl,
+          };
+        }
+        return recalculateProject(parsed);
+      }
+    } catch (e) {
+      console.warn('Gagal memuat project dari localStorage:', e);
+    }
+    return emptyCleanProject;
+  });
+
+  const [autoSyncStatus, setAutoSyncStatus] = useState<{
+    isSyncing: boolean;
+    lastSyncedAt: string | null;
+    error: string | null;
+  }>({
+    isSyncing: false,
+    lastSyncedAt: null,
+    error: null,
+  });
+
   const [userRole, setUserRole] = useState<UserRole>('kontraktor');
   const [activeTab, setActiveTab] = useState<'schedule' | 'termin' | 'chart'>('schedule');
   const [isPrintMode, setIsPrintMode] = useState<boolean>(false);
@@ -45,6 +79,71 @@ export default function App() {
   const updatedProject = useMemo(() => {
     return recalculateProject(project);
   }, [project]);
+
+  // Track last synced payload string to prevent infinite loop calls
+  const lastSyncedPayloadRef = useRef<string>('');
+
+  // Auto-Save to LocalStorage & Auto-Sync to Google Sheets upon ANY input/change
+  useEffect(() => {
+    // 1. Save to LocalStorage immediately
+    try {
+      localStorage.setItem(LOCAL_STORAGE_PROJECT_KEY, JSON.stringify(updatedProject));
+      const sheetUrl = updatedProject.sheetsConfig?.spreadsheetId || localStorage.getItem(SAVED_SHEET_URL_KEY);
+      if (sheetUrl) {
+        localStorage.setItem(SAVED_SHEET_URL_KEY, sheetUrl);
+      }
+    } catch (e) {
+      console.error('Gagal menyimpan ke localStorage:', e);
+    }
+
+    // 2. Check if Google Apps Script Web App URL is saved
+    const scriptUrl =
+      updatedProject.sheetsConfig?.spreadsheetId?.startsWith('https://script.google.com')
+        ? updatedProject.sheetsConfig.spreadsheetId
+        : localStorage.getItem(SAVED_SHEET_URL_KEY)?.startsWith('https://script.google.com')
+        ? localStorage.getItem(SAVED_SHEET_URL_KEY)
+        : null;
+
+    if (!scriptUrl) return;
+
+    // Build payload hash for change checking
+    const payloadToSync = JSON.stringify({
+      title: updatedProject.title,
+      categories: updatedProject.categories,
+      durationDays: updatedProject.durationDays,
+      currentWeek: updatedProject.currentWeek,
+    });
+
+    if (payloadToSync === lastSyncedPayloadRef.current) {
+      return;
+    }
+
+    // Set syncing status
+    setAutoSyncStatus((prev) => ({ ...prev, isSyncing: true, error: null }));
+
+    // Debounce background sync (1.5 seconds after user stops editing)
+    const timer = setTimeout(async () => {
+      try {
+        await exportToGoogleSheets(updatedProject, undefined, scriptUrl, scriptUrl);
+        lastSyncedPayloadRef.current = payloadToSync;
+        const nowTime = new Date().toLocaleTimeString('id-ID');
+        setAutoSyncStatus({
+          isSyncing: false,
+          lastSyncedAt: nowTime,
+          error: null,
+        });
+      } catch (err: any) {
+        console.warn('Auto-sync Google Sheets failed:', err);
+        setAutoSyncStatus({
+          isSyncing: false,
+          lastSyncedAt: null,
+          error: err.message || 'Gagal auto-sync ke Google Sheets.',
+        });
+      }
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [updatedProject]);
 
   // Compute week-by-week planned & actual summaries
   const weekSummaries = useMemo(() => {
@@ -373,6 +472,7 @@ export default function App() {
         onTogglePrintMode={() => setIsPrintMode(true)}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
+        autoSyncStatus={autoSyncStatus}
       />
 
       {/* Project Banner & Status */}

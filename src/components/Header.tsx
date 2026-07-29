@@ -12,6 +12,7 @@ import {
   Layers,
   UserCheck,
   Trash2,
+  RefreshCw,
 } from 'lucide-react';
 import { ProjectInfo, UserRole } from '../types/schedule';
 import { RoleSelector } from './RoleSelector';
@@ -34,6 +35,11 @@ interface HeaderProps {
   onTogglePrintMode: () => void;
   activeTab: 'schedule' | 'termin' | 'chart';
   setActiveTab: (tab: 'schedule' | 'termin' | 'chart') => void;
+  autoSyncStatus?: {
+    isSyncing: boolean;
+    lastSyncedAt: string | null;
+    error: string | null;
+  };
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -54,6 +60,7 @@ export const Header: React.FC<HeaderProps> = ({
   onTogglePrintMode,
   activeTab,
   setActiveTab,
+  autoSyncStatus,
 }) => {
   return (
     <header className="bg-[#0A0A0A] text-white border-b border-white/10 sticky top-0 z-30 font-sans">
@@ -154,8 +161,22 @@ export const Header: React.FC<HeaderProps> = ({
             className="flex items-center gap-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 text-xs px-3 py-1.5 font-bold uppercase tracking-wider transition-all"
             title="Simpan & Sync Google Sheets"
           >
-            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Google Sheets</span>
+            {autoSyncStatus?.isSyncing ? (
+              <>
+                <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#C8FF00]" />
+                <span className="text-[#C8FF00]">Auto-Syncing...</span>
+              </>
+            ) : autoSyncStatus?.lastSyncedAt ? (
+              <>
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Google Sheets <span className="text-[#C8FF00] font-mono text-[10px] lowercase">(sync {autoSyncStatus.lastSyncedAt})</span></span>
+              </>
+            ) : (
+              <>
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Google Sheets</span>
+              </>
+            )}
           </button>
 
           {/* Checklist Inspeksi Pekerjaan Tim Teknis / Konsultan */}
