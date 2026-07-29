@@ -175,31 +175,89 @@ export default function App() {
     }
   };
 
-  // Item save
-  const handleSaveItem = (savedItem: ScheduleItem) => {
+  // Add Category
+  const handleAddCategory = (code?: string, name?: string) => {
+    const defaultCode = code || (updatedProject.categories.length + 1).toString();
+    const catName = name || prompt('Masukkan Nama Kategori Utama Pekerjaan (misal: PEKERJAAN STRUKTUR):');
+    if (!catName || !catName.trim()) return;
+
     setProject((prev) => {
-      const categoriesCopy = prev.categories.map((cat) => {
-        const itemExists = cat.items.some((i) => i.id === savedItem.id);
-        if (itemExists) {
-          // Update existing item
-          return {
+      const newCategory = {
+        id: `cat-${Date.now()}`,
+        code: defaultCode,
+        name: catName.trim().toUpperCase(),
+        items: [],
+      };
+      return recalculateProject({
+        ...prev,
+        categories: [...prev.categories, newCategory],
+      });
+    });
+  };
+
+  // Item save
+  const handleSaveItem = (
+    savedItem: ScheduleItem,
+    newCategoryInfo?: { code: string; name: string }
+  ) => {
+    setProject((prev) => {
+      let categoriesCopy = [...prev.categories];
+      let targetCatId = savedItem.categoryId;
+
+      if (newCategoryInfo && newCategoryInfo.name.trim()) {
+        targetCatId = savedItem.categoryId || `cat-${Date.now()}`;
+        savedItem.categoryId = targetCatId;
+
+        const existingIndex = categoriesCopy.findIndex((c) => c.id === targetCatId);
+        if (existingIndex === -1) {
+          categoriesCopy.push({
+            id: targetCatId,
+            code: newCategoryInfo.code || `${categoriesCopy.length + 1}`,
+            name: newCategoryInfo.name.toUpperCase(),
+            items: [],
+          });
+        }
+      }
+
+      // If category list was empty, auto-create fallback category
+      if (categoriesCopy.length === 0) {
+        targetCatId = `cat-${Date.now()}`;
+        savedItem.categoryId = targetCatId;
+        categoriesCopy = [
+          {
+            id: targetCatId,
+            code: 'I',
+            name: 'PEKERJAAN UTAMA',
+            items: [savedItem],
+          },
+        ];
+      } else {
+        const itemExistsInAnyCat = categoriesCopy.some((cat) =>
+          cat.items.some((i) => i.id === savedItem.id)
+        );
+
+        if (itemExistsInAnyCat) {
+          categoriesCopy = categoriesCopy.map((cat) => ({
             ...cat,
             items: cat.items.map((i) => (i.id === savedItem.id ? savedItem : i)),
-          };
-        } else if (cat.id === savedItem.categoryId) {
-          // Append to target category
-          return {
-            ...cat,
-            items: [...cat.items, savedItem],
-          };
+          }));
+        } else {
+          categoriesCopy = categoriesCopy.map((cat) => {
+            if (cat.id === targetCatId) {
+              return {
+                ...cat,
+                items: [...cat.items, savedItem],
+              };
+            }
+            return cat;
+          });
         }
-        return cat;
-      });
+      }
 
-      return {
+      return recalculateProject({
         ...prev,
         categories: categoriesCopy,
-      };
+      });
     });
   };
 
@@ -519,6 +577,8 @@ export default function App() {
               }}
               onDeleteItem={handleDeleteItem}
               onAddItemToCategory={handleAddItemToCategory}
+              onAddCategory={() => handleAddCategory()}
+              onSelectPreset={handleSelectPreset}
               onAutoDistributeItem={handleAutoDistributeItem}
               onUpdateWeeklyCell={handleUpdateWeeklyCell}
               grandTotalCost={grandTotalCost}

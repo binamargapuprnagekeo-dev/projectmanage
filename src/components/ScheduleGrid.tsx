@@ -28,6 +28,8 @@ interface ScheduleGridProps {
   onEditItem: (item: ScheduleItem) => void;
   onDeleteItem: (itemId: string) => void;
   onAddItemToCategory: (categoryId: string) => void;
+  onAddCategory?: () => void;
+  onSelectPreset?: (presetKey: string) => void;
   onAutoDistributeItem: (item: ScheduleItem) => void;
   onUpdateWeeklyCell: (
     itemId: string,
@@ -46,6 +48,8 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
   onEditItem,
   onDeleteItem,
   onAddItemToCategory,
+  onAddCategory,
+  onSelectPreset,
   onAutoDistributeItem,
   onUpdateWeeklyCell,
   grandTotalCost,
@@ -112,6 +116,55 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
 
   return (
     <div className="bg-[#121212] border border-white/10 shadow-2xl overflow-hidden font-sans">
+      {/* Top Action Toolbar */}
+      <div className="p-3 bg-[#0A0A0A] border-b border-white/10 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="w-2.5 h-2.5 bg-[#C8FF00]" />
+          <h3 className="font-syne font-black text-sm uppercase tracking-wider text-white">
+            JADWAL PELAKSANAAN PEKERJAAN (MATRIKS KURVA S)
+          </h3>
+        </div>
+
+        {(role === 'admin' || role === 'kontraktor') && (
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => onAddItemToCategory('')}
+              className="px-3 py-1.5 bg-[#C8FF00] hover:bg-[#b5e600] text-black font-black text-xs uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md"
+            >
+              <Plus className="w-4 h-4 stroke-[2.5]" />
+              <span>+ Tambah Item Pekerjaan</span>
+            </button>
+
+            {onAddCategory && (
+              <button
+                onClick={onAddCategory}
+                className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 border border-white/20 transition-all"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Kategori Baru</span>
+              </button>
+            )}
+
+            {onSelectPreset && (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => onSelectPreset('picu-2026')}
+                  className="px-2.5 py-1.5 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 font-bold text-[11px] uppercase tracking-wider transition-all"
+                >
+                  📁 Contoh: PICU
+                </button>
+                <button
+                  onClick={() => onSelectPreset('cleanroom-2026')}
+                  className="px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold text-[11px] uppercase tracking-wider transition-all"
+                >
+                  📁 Contoh: Cleanroom
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Grid Container with horizontal scroll */}
       <div className="overflow-x-auto scrollbar-thin">
         <table className="w-full text-xs text-left border-collapse min-w-[1200px]">
@@ -196,25 +249,55 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
             {project.categories.length === 0 && (
               <tr>
                 <td colSpan={7 + project.totalWeeks} className="py-12 text-center bg-[#0D0D0D]">
-                  <div className="flex flex-col items-center justify-center space-y-3 max-w-md mx-auto">
-                    <div className="w-12 h-12 bg-white/5 border border-white/10 flex items-center justify-center text-[#C8FF00]">
-                      <Plus className="w-6 h-6" />
+                  <div className="flex flex-col items-center justify-center space-y-4 max-w-lg mx-auto p-5 border border-white/10 bg-[#121212]">
+                    <div className="w-12 h-12 bg-[#C8FF00]/10 border border-[#C8FF00]/30 flex items-center justify-center text-[#C8FF00]">
+                      <Plus className="w-6 h-6 stroke-[2.5]" />
                     </div>
                     <div>
                       <h4 className="font-syne font-black text-white text-base uppercase tracking-wide">
-                        Aplikasi Dalam Keadaan Kosong (Bersih)
+                        Tabel Item Pekerjaan Masih Kosong
                       </h4>
-                      <p className="text-xs text-white/50 mt-1">
-                        Belum ada data pekerjaan. Silakan klik tombol di bawah untuk menambah item RAB atau impor data dari Google Sheets / Excel / JSON.
+                      <p className="text-xs text-white/60 mt-1">
+                        Pilih opsi di bawah ini untuk menginput Item Pekerjaan (Uraian Pekerjaan, Satuan, Volume, Harga Satuan, Durasi & Urutan Pekerjaan), atau Muat Contoh Data RAB yang sudah siap:
                       </p>
                     </div>
-                    <button
-                      onClick={() => onAddItemToCategory('')}
-                      className="px-4 py-2 bg-[#C8FF00] text-black font-black text-xs uppercase tracking-wider flex items-center gap-2 hover:bg-[#b5e600] transition-all shadow-lg"
-                    >
-                      <Plus className="w-4 h-4 stroke-[2.5]" />
-                      Tambah Item Pekerjaan Baru
-                    </button>
+
+                    <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+                      <button
+                        onClick={() => onAddItemToCategory('')}
+                        className="px-4 py-2 bg-[#C8FF00] text-black font-black text-xs uppercase tracking-wider flex items-center gap-2 hover:bg-[#b5e600] transition-all shadow-lg"
+                      >
+                        <Plus className="w-4 h-4 stroke-[2.5]" />
+                        + Input Item Pekerjaan
+                      </button>
+
+                      {onAddCategory && (
+                        <button
+                          onClick={onAddCategory}
+                          className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-2 border border-white/20 transition-all"
+                        >
+                          <Plus className="w-4 h-4" />
+                          + Kategori Baru
+                        </button>
+                      )}
+
+                      {onSelectPreset && (
+                        <>
+                          <button
+                            onClick={() => onSelectPreset('picu-2026')}
+                            className="px-3 py-2 bg-sky-500/20 text-sky-300 border border-sky-500/40 hover:bg-sky-500/30 text-xs font-bold uppercase tracking-wider transition-all"
+                          >
+                            📁 Muat Contoh PICU (Rp 882 Jt)
+                          </button>
+                          <button
+                            onClick={() => onSelectPreset('cleanroom-2026')}
+                            className="px-3 py-2 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30 text-xs font-bold uppercase tracking-wider transition-all"
+                          >
+                            📁 Muat Contoh Cleanroom (Rp 844 Jt)
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </td>
               </tr>

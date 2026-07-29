@@ -10,7 +10,10 @@ interface ItemEditorModalProps {
   categories: Category[];
   targetCategoryId?: string;
   project: ProjectInfo;
-  onSaveItem: (savedItem: ScheduleItem) => void;
+  onSaveItem: (
+    savedItem: ScheduleItem,
+    newCategoryInfo?: { code: string; name: string }
+  ) => void;
 }
 
 export const ItemEditorModal: React.FC<ItemEditorModalProps> = ({
@@ -23,6 +26,9 @@ export const ItemEditorModal: React.FC<ItemEditorModalProps> = ({
   onSaveItem,
 }) => {
   const [categoryId, setCategoryId] = useState<string>('');
+  const [isCreatingNewCategory, setIsCreatingNewCategory] = useState<boolean>(false);
+  const [newCategoryCode, setNewCategoryCode] = useState<string>('I');
+  const [newCategoryName, setNewCategoryName] = useState<string>('PEKERJAAN PERSIAPAN');
   const [itemNo, setItemNo] = useState<string>('1');
   const [description, setDescription] = useState<string>('');
   const [unit, setUnit] = useState<string>('m²');
@@ -35,6 +41,7 @@ export const ItemEditorModal: React.FC<ItemEditorModalProps> = ({
 
   useEffect(() => {
     if (item) {
+      setIsCreatingNewCategory(false);
       setCategoryId(item.categoryId);
       setItemNo(item.itemNo);
       setDescription(item.description);
@@ -51,17 +58,26 @@ export const ItemEditorModal: React.FC<ItemEditorModalProps> = ({
         setEndWeek(Math.max(...activeWeeks));
       }
     } else {
-      setCategoryId(targetCategoryId || categories[0]?.id || '');
+      if (categories.length === 0) {
+        setIsCreatingNewCategory(true);
+        setNewCategoryCode('I');
+        setNewCategoryName('PEKERJAAN UMUM & PERSIAPAN');
+        setCategoryId('');
+      } else {
+        setIsCreatingNewCategory(false);
+        const defaultCat = targetCategoryId || categories[0]?.id || '';
+        setCategoryId(defaultCat);
+      }
       setItemNo((categories.flatMap((c) => c.items).length + 1).toString());
       setDescription('');
       setUnit('m²');
       setVolume('1');
       setUnitPrice('100000');
       setStartWeek(1);
-      setEndWeek(4);
+      setEndWeek(Math.min(4, project.totalWeeks || 4));
       setWeeklyPlan({});
     }
-  }, [item, targetCategoryId, categories, isOpen]);
+  }, [item, targetCategoryId, categories, isOpen, project.totalWeeks]);
 
   if (!isOpen) return null;
 
@@ -72,8 +88,9 @@ export const ItemEditorModal: React.FC<ItemEditorModalProps> = ({
   // Approximate weight
   const grandTotalCost = categories.reduce((sum, c) => {
     return sum + c.items.reduce((itemSum, i) => itemSum + i.totalPrice, 0);
-  }, 0) || 1;
-  const approxWeight = (totalPrice / (grandTotalCost || totalPrice || 1)) * 100;
+  }, 0) || totalPrice || 1;
+
+  const approxWeight = totalPrice > 0 ? (totalPrice / (grandTotalCost || totalPrice)) * 100 : 0;
 
   const handleApplyAutoDistribution = () => {
     const distributedPlan = autoDistributeWeeklyPlan(
@@ -91,9 +108,36 @@ export const ItemEditorModal: React.FC<ItemEditorModalProps> = ({
       return;
     }
 
+    if (isCreatingNewCategory && !newCategoryName.trim()) {
+      alert('Nama Kategori Pekerjaan Baru wajib diisi.');
+      return;
+    }
+
+    // Auto calculate weekly plan if user didn't manually click apply
+    let finalWeeklyPlan = weeklyPlan;
+    if (Object.keys(finalWeeklyPlan).length === 0 && approxWeight > 0) {
+      finalWeeklyPlan = autoDistributeWeeklyPlan(
+        approxWeight,
+        startWeek,
+        endWeek,
+        distributionMode
+      );
+    }
+
+    let targetCatId = categoryId;
+    let newCatInfo: { code: string; name: string } | undefined = undefined;
+
+    if (isCreatingNewCategory || categories.length === 0 || !categoryId) {
+      targetCatId = `cat-${Date.now()}`;
+      newCatInfo = {
+        code: newCategoryCode || 'I',
+        name: newCategoryName || 'PEKERJAAN PERSIAPAN',
+      };
+    }
+
     const newItem: ScheduleItem = {
       id: item ? item.id : `item-${Date.now()}`,
-      categoryId: categoryId || categories[0]?.id || 'cat-1',
+      categoryId: targetCatId,
       itemNo: itemNo || '1',
       description,
       unit,
@@ -103,11 +147,11 @@ export const ItemEditorModal: React.FC<ItemEditorModalProps> = ({
       weightPercent: Number(approxWeight.toFixed(4)),
       startWeek,
       endWeek,
-      weeklyPlan,
+      weeklyPlan: finalWeeklyPlan,
       weeklyActual: item ? item.weeklyActual : {},
     };
 
-    onSaveItem(newItem);
+    onSaveItem(newItem, newCatInfo);
     onClose();
   };
 
@@ -131,9 +175,46 @@ export const ItemEditorModal: React.FC<ItemEditorModalProps> = ({
         {/* Form Body */}
         <div className="p-5 overflow-y-auto space-y-4 flex-1 text-xs">
           {/* Category & No */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="sm:col-span-2 space-y-1">
-              <label className="font-bold uppercase tracking-wider text-white/70 text-[10px]">Kategori Pekerjaan</label>
+          <div className="space-y-2 p-3 bg-[#1A1A1A] border border-white/10">
+            <div className="flex items-center justify-between">
+              <label className="font-bold uppercase tracking-wider text-[#C8FF00] text-[10px]">
+                Kategori Utama Pekerjaan (Sub-Kelompok RAB)
+              </label>
+              {categories.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setIsCreatingNewCategory(!isCreatingNewCategory)}
+                  className="text-[10px] bg-white/10 hover:bg-[#C8FF00] hover:text-black text-white px-2 py-0.5 font-bold uppercase transition-all"
+                >
+                  {isCreatingNewCategory ? '← Pilih Kategori Ada' : '+ Buat Kategori Baru'}
+                </button>
+              )}
+            </div>
+
+            {isCreatingNewCategory || categories.length === 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 pt-1">
+                <div className="space-y-1">
+                  <label className="text-[9px] text-white/50 font-bold uppercase">Kode Kategori</label>
+                  <input
+                    type="text"
+                    value={newCategoryCode}
+                    onChange={(e) => setNewCategoryCode(e.target.value)}
+                    placeholder="e.g. I / II"
+                    className="w-full bg-[#0A0A0A] border border-white/20 text-white p-2 font-bold uppercase focus:outline-none focus:border-[#C8FF00]"
+                  />
+                </div>
+                <div className="sm:col-span-3 space-y-1">
+                  <label className="text-[9px] text-white/50 font-bold uppercase">Nama Kategori Utama Baru</label>
+                  <input
+                    type="text"
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    placeholder="Contoh: PEKERJAAN PERSIAPAN / PEKERJAAN TANAH"
+                    className="w-full bg-[#0A0A0A] border border-white/20 text-white p-2 font-bold uppercase focus:outline-none focus:border-[#C8FF00]"
+                  />
+                </div>
+              </div>
+            ) : (
               <select
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
@@ -145,9 +226,13 @@ export const ItemEditorModal: React.FC<ItemEditorModalProps> = ({
                   </option>
                 ))}
               </select>
-            </div>
+            )}
+          </div>
+
+          {/* Item No & Description */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div className="space-y-1">
-              <label className="font-bold uppercase tracking-wider text-white/70 text-[10px]">No. Item</label>
+              <label className="font-bold uppercase tracking-wider text-white/70 text-[10px]">No. Item Pekerjaan</label>
               <input
                 type="text"
                 value={itemNo}
@@ -156,18 +241,16 @@ export const ItemEditorModal: React.FC<ItemEditorModalProps> = ({
                 placeholder="e.g. 1 / 2.a"
               />
             </div>
-          </div>
-
-          {/* Description */}
-          <div className="space-y-1">
-            <label className="font-bold uppercase tracking-wider text-white/70 text-[10px]">Uraian Pekerjaan</label>
-            <textarea
-              rows={2}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Contoh: Pemasangan 1 m2 dinding bata merah tebal 1/2 batu"
-              className="w-full bg-[#0A0A0A] border border-white/20 text-white p-2.5 font-bold focus:outline-none focus:border-[#C8FF00]"
-            />
+            <div className="sm:col-span-3 space-y-1">
+              <label className="font-bold uppercase tracking-wider text-white/70 text-[10px]">Uraian Pekerjaan / Rincian Kegiatan</label>
+              <textarea
+                rows={2}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Contoh: Pemasangan 1 m2 dinding bata merah tebal 1/2 batu mortar 1SP : 5PP"
+                className="w-full bg-[#0A0A0A] border border-white/20 text-white p-2.5 font-bold focus:outline-none focus:border-[#C8FF00]"
+              />
+            </div>
           </div>
 
           {/* Unit, Volume, Unit Price */}
