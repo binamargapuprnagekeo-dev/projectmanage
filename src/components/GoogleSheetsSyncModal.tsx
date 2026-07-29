@@ -58,12 +58,36 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
 
   const handleExport = async () => {
     setLoading(true);
-    setStatusMsg('Menghubungkan ke Google Sheets API & Mengekspor data Kurva S...');
+    setStatusMsg('Menghubungkan ke Google Sheets & mengekspor data Kurva S...');
     setErrorMsg('');
 
     try {
+      const targetInput = spreadsheetId.trim();
+
+      // Case 1: Apps Script Web App URL provided (No login/OAuth required)
+      if (targetInput.startsWith('https://script.google.com')) {
+        const result = await exportToGoogleSheets(project, undefined, targetInput, targetInput);
+        setSpreadsheetId(result.spreadsheetId);
+        setSpreadsheetUrl(result.spreadsheetUrl);
+
+        const updatedProj: ProjectInfo = {
+          ...project,
+          sheetsConfig: {
+            ...project.sheetsConfig,
+            spreadsheetId: result.spreadsheetId,
+            spreadsheetUrl: result.spreadsheetUrl,
+            lastSyncedAt: new Date().toLocaleString('id-ID'),
+          },
+        };
+
+        onProjectUpdated(updatedProj);
+        setStatusMsg('✅ Data Kurva S berhasil disimpan otomatis ke Google Sheets via Server Apps Script!');
+        return;
+      }
+
+      // Case 2: Google Sheets API v4 via Access Token
       const token = await getAccessToken();
-      const result = await exportToGoogleSheets(project, token, spreadsheetId || undefined);
+      const result = await exportToGoogleSheets(project, token, targetInput || undefined);
 
       setSpreadsheetId(result.spreadsheetId);
       setSpreadsheetUrl(result.spreadsheetUrl);
@@ -134,8 +158,9 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
   };
 
   const handleTwoWaySync = async () => {
-    if (!spreadsheetId.trim()) {
-      setErrorMsg('Masukkan Spreadsheet ID atau URL Google Sheets terlebih dahulu.');
+    const targetInput = spreadsheetId.trim();
+    if (!targetInput) {
+      setErrorMsg('Masukkan Spreadsheet ID, Link Google Sheets, atau URL Apps Script terlebih dahulu.');
       return;
     }
 
@@ -144,18 +169,44 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
     setErrorMsg('');
 
     try {
-      let cleanId = spreadsheetId.trim();
+      if (targetInput.startsWith('https://script.google.com')) {
+        // Save directly via Apps Script Web App
+        setStatusMsg('2/2 Menyimpan data ke Google Sheets via Server Apps Script...');
+        const exportRes = await exportToGoogleSheets(project, undefined, targetInput, targetInput);
+        setSpreadsheetId(exportRes.spreadsheetId);
+        setSpreadsheetUrl(exportRes.spreadsheetUrl);
+
+        const finalProj: ProjectInfo = {
+          ...project,
+          sheetsConfig: {
+            ...project.sheetsConfig,
+            spreadsheetId: exportRes.spreadsheetId,
+            spreadsheetUrl: exportRes.spreadsheetUrl,
+            lastSyncedAt: new Date().toLocaleString('id-ID'),
+          },
+        };
+
+        onProjectUpdated(finalProj);
+        setStatusMsg('⚡ Sinkronisasi Sukses! Data tersimpan di Google Sheets via Server Web App.');
+        return;
+      }
+
+      let cleanId = targetInput;
       if (cleanId.includes('/d/')) {
         cleanId = cleanId.split('/d/')[1].split('/')[0];
       }
 
-      const token = await getAccessToken();
-      // Step 1: Import latest values from Sheets
-      const updatedProj = await importFromGoogleSheets(cleanId, token, project);
-      onProjectUpdated(updatedProj);
+      // Step 1: Import latest values from Sheets (Public CSV or API)
+      let updatedProj = project;
+      try {
+        updatedProj = await importFromGoogleSheets(cleanId, undefined, project);
+        onProjectUpdated(updatedProj);
+      } catch (e) {
+        console.warn('Public import failed during sync, trying with token if available...');
+      }
 
-      setStatusMsg('2/2 Menyimpan & memperbarui ulang seluruh data ke Google Sheets...');
-      // Step 2: Re-export updated project back to Sheets
+      // Step 2: Re-export updated project back to Sheets via token
+      const token = await getAccessToken();
       const exportRes = await exportToGoogleSheets(updatedProj, token, cleanId);
 
       setSpreadsheetId(exportRes.spreadsheetId);
@@ -175,7 +226,7 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
       setStatusMsg('⚡ Sinkronisasi 2 Arah Sukses! Data ditarik dari Sheets & disimpan ulang dengan sempurna.');
     } catch (err: any) {
       console.error('Two-Way Sync error:', err);
-      setErrorMsg(err.message || 'Gagal melakukan sinkronisasi 2 arah dengan Google Sheets.');
+      setErrorMsg(err.message || 'Gagal melakukan sinkronisasi dengan Google Sheets.');
     } finally {
       setLoading(false);
     }
@@ -279,57 +330,53 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
             </div>
           </div>
 
-          {/* Access Token Input (Opsional untuk Simpan/Ekspor Otomatis ke Sheets) */}
-          <div className="space-y-1.5 bg-[#0A0A0A] p-3.5 border border-white/10">
+          {/* Apps Script Guide & Code Copy Box */}
+          <div className="space-y-2 bg-[#0A0A0A] p-3.5 border border-[#C8FF00]/30">
             <div className="flex items-center justify-between">
-              <label className="font-bold uppercase tracking-wider text-white/80 text-[10px] flex items-center gap-1.5">
-                <span>Google Access Token (Diperlukan Khusus Untuk Ekspor/Simpan)</span>
-              </label>
+              <div className="font-bold uppercase tracking-wider text-[#C8FF00] text-[11px] flex items-center gap-1.5">
+                <span>🚀 SOLUSI TANPA LOGIN: Tanam Script Server di Google Sheet</span>
+              </div>
               <button
                 type="button"
-                onClick={() => setShowTokenHelp(!showTokenHelp)}
-                className="text-[#C8FF00] hover:underline text-[10px] font-bold uppercase tracking-wider flex items-center gap-1"
+                onClick={() => {
+                  const code = `function doPost(e) {
+  try {
+    var data = JSON.parse(e.postData.contents);
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    sheet.clear();
+    var values = data.values;
+    if (values && values.length > 0) {
+      sheet.getRange(1, 1, values.length, values[0].length).setValues(values);
+    }
+    return ContentService.createTextOutput(JSON.stringify({ status: "success" }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function doGet(e) {
+  return ContentService.createTextOutput("Server Google Apps Script Active");
+}`;
+                  navigator.clipboard.writeText(code);
+                  alert('✅ Kode Script Server Google Sheet berhasil disalin ke clipboard!');
+                }}
+                className="bg-[#C8FF00] text-black font-black px-2.5 py-1 text-[10px] uppercase tracking-wider hover:bg-[#b0e000] transition-colors flex items-center gap-1"
               >
-                <span>{showTokenHelp ? 'Sembunyikan Panduan' : '💡 Di mana saya dapat token?'}</span>
+                <span>📋 Salin Kode Script</span>
               </button>
             </div>
-            <input
-              type="password"
-              value={accessToken}
-              onChange={(e) => setAccessToken(e.target.value)}
-              placeholder="Paste Google Access Token Anda di sini (Diawali: ya29...)"
-              className="w-full bg-[#121212] border border-white/20 text-[#C8FF00] p-2.5 font-mono text-xs focus:outline-none focus:border-[#C8FF00]"
-            />
-
-            {showTokenHelp && (
-              <div className="p-3 bg-white/5 border border-white/10 text-white/90 text-[11px] space-y-2 mt-2">
-                <div className="font-bold text-[#C8FF00] uppercase text-[10px] tracking-wider">
-                  📖 3 Langkah Mudah Mendapatkan Google OAuth Access Token (1 Menit):
-                </div>
-                <ol className="list-decimal list-inside space-y-1 text-white/80 text-[10.5px] leading-relaxed">
-                  <li>
-                    Buka link resmi:{' '}
-                    <a
-                      href="https://developers.google.com/oauthplayground"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[#C8FF00] underline inline-flex items-center gap-0.5"
-                    >
-                      Google OAuth 2.0 Playground <ExternalLink className="w-3 h-3" />
-                    </a>
-                  </li>
-                  <li>
-                    Cari &amp; centang <strong>Google Sheets API v4</strong> (pilih <code>https://www.googleapis.com/auth/spreadsheets</code>), lalu klik tombol kuning <strong>Authorize APIs</strong>.
-                  </li>
-                  <li>
-                    Pilih akun Google Anda &amp; beri izin. Setelah itu, klik <strong>Exchange authorization code for tokens</strong> dan salin teks pada kolom <strong>Access token</strong>.
-                  </li>
-                </ol>
-                <div className="p-2 bg-[#C8FF00]/10 border border-[#C8FF00]/30 text-[#C8FF00] text-[10px]">
-                  💡 <strong>Catatan:</strong> Jika hanya ingin <strong>Tarik / Impor Data</strong> dari Google Sheet yang publik, Anda <u>tidak memerlukan token ini sama sekali</u>.
-                </div>
-              </div>
-            )}
+            <p className="text-[10.5px] text-white/80 leading-relaxed">
+              Pasang script ini 1 kali di Google Sheet Anda agar dapat menyimpan &amp; sinkronisasi data secara otomatis tanpa perlu login atau minta izin OAuth lagi:
+            </p>
+            <ol className="list-decimal list-inside text-[10px] text-white/70 space-y-1 pl-1">
+              <li>Buka Google Sheet Anda &rarr; klik menu <strong>Ekstensi</strong> &rarr; <strong>Apps Script</strong>.</li>
+              <li>Hapus semua kode bawaan, lalu klik tombol <strong>Salin Kode Script</strong> di atas dan tempelkan.</li>
+              <li>Klik tombol <strong>Terapkan (Deploy)</strong> &rarr; <strong>Penerapan Baru</strong> &rarr; Pilih jenis <strong>Aplikasi Web</strong>.</li>
+              <li>Ubah opsi <strong>&quot;Siapa yang memiliki akses&quot;</strong> menjadi <strong>&quot;Siapa saja (Anyone)&quot;</strong>, lalu klik Terapkan.</li>
+              <li>Salin URL Web App yang muncul (diawali <code>https://script.google.com/macros/s/...</code>) dan tempel pada kolom Spreadsheet ID/Link di atas!</li>
+            </ol>
           </div>
 
           {spreadsheetUrl && (

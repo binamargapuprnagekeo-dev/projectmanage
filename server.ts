@@ -127,6 +127,35 @@ Format JSON yang harus dihasilkan:
   }
 });
 
+// Proxy endpoint for Google Apps Script Web App (Server-to-Server Sync)
+app.post('/api/sheets-proxy', async (req, res) => {
+  try {
+    const { scriptUrl, payload } = req.body;
+    if (!scriptUrl || !scriptUrl.startsWith('https://script.google.com')) {
+      return res.status(400).json({ error: 'URL Google Apps Script Web App tidak valid.' });
+    }
+
+    const response = await fetch(scriptUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const text = await response.text();
+    let jsonResult;
+    try {
+      jsonResult = JSON.parse(text);
+    } catch (e) {
+      jsonResult = { message: text };
+    }
+
+    return res.json({ success: true, result: jsonResult });
+  } catch (err: any) {
+    console.error('Sheets Proxy Error:', err);
+    return res.status(500).json({ error: err.message || 'Gagal menghubungkan ke Google Apps Script Web App.' });
+  }
+});
+
 // Setup Vite middleware in dev mode, or serve static dist in prod mode
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
