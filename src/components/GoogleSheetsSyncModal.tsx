@@ -379,7 +379,15 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
 }
 
 function doGet(e) {
-  return ContentService.createTextOutput("Server Google Apps Script Active");
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    var values = sheet.getDataRange().getValues();
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", values: values }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Server Google Apps Script Active" }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
 }`;
                   navigator.clipboard.writeText(code);
                   alert('✅ Kode Script Server Google Sheet berhasil disalin ke clipboard!');

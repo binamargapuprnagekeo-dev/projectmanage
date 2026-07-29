@@ -131,42 +131,79 @@ Format JSON yang harus dihasilkan:
 app.post('/api/sheets-proxy', async (req, res) => {
   try {
     const { scriptUrl, payload } = req.body;
-    if (!scriptUrl || !scriptUrl.startsWith('https://script.google.com')) {
-      return res.status(400).json({ error: 'URL Google Apps Script Web App tidak valid.' });
+    if (!scriptUrl || typeof scriptUrl !== 'string' || !scriptUrl.startsWith('https://script.google.com')) {
+      return res.status(400).json({ error: 'URL Google Apps Script Web App tidak valid. Harus diawali dengan https://script.google.com' });
     }
 
-    const response = await fetch(scriptUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      redirect: 'follow',
-    });
+    // Clean and normalize scriptUrl to ensure /exec
+    let targetUrl = scriptUrl.trim();
+    if (targetUrl.includes('/macros/s/') && !targetUrl.endsWith('/exec')) {
+      if (targetUrl.endsWith('/edit')) {
+        targetUrl = targetUrl.replace(/\/edit$/, '/exec');
+      } else if (!targetUrl.includes('/exec')) {
+        targetUrl = targetUrl.replace(/\/+$/, '') + '/exec';
+      }
+    }
 
-    const text = await response.text();
+    let responseText = '';
+    let currentUrl = targetUrl;
+    let redirectsCount = 0;
 
-    if (text.includes('<!DOCTYPE html>') || text.includes('Google Accounts') || text.includes('accounts.google.com')) {
+    // Manually follow up to 5 redirects to keep POST method and body
+    while (redirectsCount < 5) {
+      const response = await fetch(currentUrl, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify(payload),
+        redirect: 'manual',
+      });
+
+      if ([301, 302, 303, 307, 308].includes(response.status)) {
+        const redirectLocation = response.headers.get('location');
+        if (redirectLocation) {
+          currentUrl = redirectLocation;
+          redirectsCount++;
+          continue;
+        }
+      }
+
+      responseText = await response.text();
+      break;
+    }
+
+    if (
+      responseText.includes('<!DOCTYPE html>') ||
+      responseText.includes('Google Accounts') ||
+      responseText.includes('accounts.google.com') ||
+      responseText.includes('Sign in') ||
+      responseText.includes('ServiceLogin')
+    ) {
       return res.status(400).json({
-        error: 'Akses ditolak oleh Google. Pastikan setelan pendeploian Google Apps Script diatur ke: "Siapa saja" (Anyone).',
+        error:
+          '🔒 Akses Web App Ditolak oleh Google! Mohon buka Google Sheet Anda -> Ekstensi -> Apps Script -> Terapkan (Deploy) -> Penerapan Baru -> Ubah "Siapa yang memiliki akses" (Who has access) menjadi "Siapa saja" (Anyone) -> Klik Terapkan.',
       });
     }
 
     let jsonResult;
     try {
-      jsonResult = JSON.parse(text);
+      jsonResult = JSON.parse(responseText);
     } catch (e) {
-      jsonResult = { message: text };
+      jsonResult = { status: 'success', message: responseText };
     }
 
     if (jsonResult && jsonResult.status === 'error') {
       return res.status(400).json({
-        error: jsonResult.message || 'Google Apps Script mengembalikan pesan error.',
+        error: jsonResult.message || 'Google Apps Script mengembalikan pesan error saat menyimpan data.',
       });
     }
 
     return res.json({ success: true, result: jsonResult });
   } catch (err: any) {
     console.error('Sheets Proxy Error:', err);
-    return res.status(500).json({ error: err.message || 'Gagal menghubungkan ke Google Apps Script Web App.' });
+    return res.status(500).json({ error: err.message || 'Gagal terhubung ke server Google Apps Script Web App.' });
   }
 });
 

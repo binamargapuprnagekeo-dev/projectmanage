@@ -28,24 +28,28 @@ const SAVED_SHEET_URL_KEY = 'kurva_s_google_sheets_url';
 
 export default function App() {
   const [project, setProject] = useState<ProjectInfo>(() => {
+    let initialProject = emptyCleanProject;
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_PROJECT_KEY);
-      const savedSheetUrl = localStorage.getItem(SAVED_SHEET_URL_KEY);
       if (saved) {
-        const parsed = JSON.parse(saved);
-        if (savedSheetUrl) {
-          parsed.sheetsConfig = {
-            ...parsed.sheetsConfig,
-            spreadsheetId: savedSheetUrl,
-            spreadsheetUrl: savedSheetUrl,
-          };
-        }
-        return recalculateProject(parsed);
+        initialProject = JSON.parse(saved);
       }
     } catch (e) {
       console.warn('Gagal memuat project dari localStorage:', e);
     }
-    return emptyCleanProject;
+
+    const savedSheetUrl = localStorage.getItem(SAVED_SHEET_URL_KEY);
+    if (savedSheetUrl) {
+      initialProject = {
+        ...initialProject,
+        sheetsConfig: {
+          ...initialProject.sheetsConfig,
+          spreadsheetId: savedSheetUrl,
+          spreadsheetUrl: savedSheetUrl,
+        },
+      };
+    }
+    return recalculateProject(initialProject);
   });
 
   const [autoSyncStatus, setAutoSyncStatus] = useState<{
