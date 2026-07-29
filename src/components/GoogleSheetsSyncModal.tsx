@@ -17,6 +17,8 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
   const [spreadsheetId, setSpreadsheetId] = useState(
     project.sheetsConfig?.spreadsheetId || ''
   );
+  const [accessToken, setAccessToken] = useState('');
+  const [showTokenHelp, setShowTokenHelp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -25,6 +27,9 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
   );
 
   const getAccessToken = async (): Promise<string> => {
+    if (accessToken && accessToken.trim()) {
+      return accessToken.trim();
+    }
     return new Promise((resolve, reject) => {
       if (typeof window !== 'undefined' && (window as any).google?.accounts?.oauth2) {
         const tokenClient = (window as any).google.accounts.oauth2.initTokenClient({
@@ -32,6 +37,7 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
           scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file',
           callback: (response: any) => {
             if (response.access_token) {
+              setAccessToken(response.access_token);
               resolve(response.access_token);
             } else {
               reject(new Error('Akses Google Sheets ditolak. Pastikan memberikan izin saat pop-up OAuth muncul.'));
@@ -40,18 +46,12 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
         });
         tokenClient.requestAccessToken();
       } else {
-        const manualToken = prompt(
-          'Gunakan Google OAuth Access Token untuk menyambung ke Google Sheets API.\n\nJika belum ada token, masukkan token Anda atau klik Batal untuk menggunakan opsi Impor/Ekspor Excel (.xlsx) gratis yang tidak memerlukan izin:'
+        setShowTokenHelp(true);
+        reject(
+          new Error(
+            'Silakan masukkan Google OAuth Access Token pada kolom di bawah ini, atau gunakan opsi Impor/Ekspor Excel (.xlsx) di menu utama.'
+          )
         );
-        if (manualToken && manualToken.trim()) {
-          resolve(manualToken.trim());
-        } else {
-          reject(
-            new Error(
-              'Akses Google Sheets membutuhkan Access Token valid dari Google.\n\nTips: Anda juga bisa memakai fitur "Ekspor Excel / JSON" di header jika ingin langsung membuka file di Google Sheets tanpa perlu izin API!'
-            )
-          );
-        }
       }
     });
   };
@@ -213,13 +213,21 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
           <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 text-emerald-200 text-[11px] space-y-1.5">
             <div className="font-bold flex items-center gap-1.5 text-[#C8FF00] uppercase tracking-wider text-[11px]">
               <AlertCircle className="w-4 h-4 text-[#C8FF00]" />
-              <span>Sistem Integrasi Link Google Sheets</span>
+              <span>Integrasi Google Sheets Kosong &amp; Otomatis</span>
             </div>
             <p className="leading-relaxed text-white/90">
-              🟢 <strong>Membaca &amp; Tarik Progress (Bebas Izin/Login):</strong> Cukup bagikan Google Spreadsheet Anda dengan setelan <em>&quot;Siapa saja yang memiliki link dapat melihat&quot;</em>. Siapa pun bisa menempelkan link dan klik <strong>&quot;Tarik / Impor Dari Sheets&quot;</strong> tanpa perlunya login atau OAuth.
-            </p>
-            <p className="leading-relaxed text-white/80">
-              ⚡ <strong>Simpan / Ekspor Ke Sheets:</strong> Membutuhkan kredenasi Access Token Google API. Sebagai alternatif langsung, Anda juga bisa klik menu <strong>&quot;EKSPOR EXCEL (.XLSX)&quot;</strong> di header untuk mengunduh dan membuka file langsung di Google Sheets.
+              ✨ <strong>Ingin Menggunakan Sheet Kosong?</strong><br />
+              1. **Cara Otomatis:** Kosongkan kolom Link/ID di bawah lalu klik <strong>&quot;Simpan / Ekspor Ke Sheets&quot;</strong> (sistem akan membuat file Google Spreadsheet baru di Drive Anda).<br />
+              2. **Cara Manual:** Buka{' '}
+              <a
+                href="https://sheets.new"
+                target="_blank"
+                rel="noreferrer"
+                className="text-[#C8FF00] font-bold underline inline-flex items-center gap-0.5"
+              >
+                sheets.new (Google Sheet Kosong Baru) <ExternalLink className="w-3 h-3" />
+              </a>
+              , lalu tempel (paste) link-nya di kolom bawah dan klik <strong>&quot;Simpan / Ekspor Ke Sheets&quot;</strong>.
             </p>
           </div>
 
@@ -239,24 +247,89 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
 
           {/* Spreadsheet ID / Link Input */}
           <div className="space-y-1.5 bg-[#0A0A0A] p-3.5 border border-white/10">
-            <label className="font-bold uppercase tracking-wider text-white/80 text-[10px] flex items-center justify-between">
-              <span>Spreadsheet ID / Link Google Sheets</span>
-              {project.sheetsConfig?.lastSyncedAt && (
-                <span className="text-white/40 font-mono text-[9px]">
-                  Terakhir Sync: {project.sheetsConfig.lastSyncedAt}
-                </span>
+            <div className="flex items-center justify-between">
+              <label className="font-bold uppercase tracking-wider text-white/80 text-[10px]">
+                <span>Spreadsheet ID / Link Google Sheets</span>
+              </label>
+              {spreadsheetId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSpreadsheetId('');
+                    setStatusMsg('Kolom dikosongkan. Klik "Simpan / Ekspor Ke Sheets" di bawah untuk membuat Google Spreadsheet baru.');
+                  }}
+                  className="text-amber-400 hover:text-amber-300 text-[10px] font-bold uppercase tracking-wider underline flex items-center gap-1"
+                >
+                  <span>⚡ Kosongkan Kolom (Buat Sheet Baru)</span>
+                </button>
               )}
-            </label>
+            </div>
             <input
               type="text"
               value={spreadsheetId}
               onChange={(e) => setSpreadsheetId(e.target.value)}
-              placeholder="Contoh: 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms atau paste link lengkap"
+              placeholder="Tempel link Google Sheet Anda di sini (atau biarkan kosong untuk buat sheet baru)"
               className="w-full bg-[#121212] border border-white/20 text-white p-2.5 font-mono text-xs focus:outline-none focus:border-[#C8FF00]"
             />
-            <p className="text-[10px] text-white/50 font-mono">
-              Kosongkan ID jika ingin membuat Google Spreadsheet baru secara otomatis.
-            </p>
+            <div className="flex items-center justify-between text-[10px] text-white/50 font-mono">
+              <span>Biarkan kosong jika ingin aplikasi membuatkan Google Spreadsheet baru di Drive.</span>
+              {project.sheetsConfig?.lastSyncedAt && (
+                <span className="text-white/40">Sync: {project.sheetsConfig.lastSyncedAt}</span>
+              )}
+            </div>
+          </div>
+
+          {/* Access Token Input (Opsional untuk Simpan/Ekspor Otomatis ke Sheets) */}
+          <div className="space-y-1.5 bg-[#0A0A0A] p-3.5 border border-white/10">
+            <div className="flex items-center justify-between">
+              <label className="font-bold uppercase tracking-wider text-white/80 text-[10px] flex items-center gap-1.5">
+                <span>Google Access Token (Diperlukan Khusus Untuk Ekspor/Simpan)</span>
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowTokenHelp(!showTokenHelp)}
+                className="text-[#C8FF00] hover:underline text-[10px] font-bold uppercase tracking-wider flex items-center gap-1"
+              >
+                <span>{showTokenHelp ? 'Sembunyikan Panduan' : '💡 Di mana saya dapat token?'}</span>
+              </button>
+            </div>
+            <input
+              type="password"
+              value={accessToken}
+              onChange={(e) => setAccessToken(e.target.value)}
+              placeholder="Paste Google Access Token Anda di sini (Diawali: ya29...)"
+              className="w-full bg-[#121212] border border-white/20 text-[#C8FF00] p-2.5 font-mono text-xs focus:outline-none focus:border-[#C8FF00]"
+            />
+
+            {showTokenHelp && (
+              <div className="p-3 bg-white/5 border border-white/10 text-white/90 text-[11px] space-y-2 mt-2">
+                <div className="font-bold text-[#C8FF00] uppercase text-[10px] tracking-wider">
+                  📖 3 Langkah Mudah Mendapatkan Google OAuth Access Token (1 Menit):
+                </div>
+                <ol className="list-decimal list-inside space-y-1 text-white/80 text-[10.5px] leading-relaxed">
+                  <li>
+                    Buka link resmi:{' '}
+                    <a
+                      href="https://developers.google.com/oauthplayground"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[#C8FF00] underline inline-flex items-center gap-0.5"
+                    >
+                      Google OAuth 2.0 Playground <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </li>
+                  <li>
+                    Cari &amp; centang <strong>Google Sheets API v4</strong> (pilih <code>https://www.googleapis.com/auth/spreadsheets</code>), lalu klik tombol kuning <strong>Authorize APIs</strong>.
+                  </li>
+                  <li>
+                    Pilih akun Google Anda &amp; beri izin. Setelah itu, klik <strong>Exchange authorization code for tokens</strong> dan salin teks pada kolom <strong>Access token</strong>.
+                  </li>
+                </ol>
+                <div className="p-2 bg-[#C8FF00]/10 border border-[#C8FF00]/30 text-[#C8FF00] text-[10px]">
+                  💡 <strong>Catatan:</strong> Jika hanya ingin <strong>Tarik / Impor Data</strong> dari Google Sheet yang publik, Anda <u>tidak memerlukan token ini sama sekali</u>.
+                </div>
+              </div>
+            )}
           </div>
 
           {spreadsheetUrl && (
