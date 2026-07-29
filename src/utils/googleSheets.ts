@@ -221,13 +221,28 @@ export async function exportToGoogleSheets(
     ...weekSummaries.map((s) => s.deviationCumulative),
   ]);
 
+  // Ensure 2D matrix is rectangular (every row has equal number of columns = maxCols)
+  let maxCols = 0;
+  values.forEach((r) => {
+    if (r.length > maxCols) maxCols = r.length;
+  });
+  if (maxCols === 0) maxCols = 1;
+
+  const normalizedValues = values.map((row) => {
+    const padded = [...row];
+    while (padded.length < maxCols) {
+      padded.push('');
+    }
+    return padded;
+  });
+
   // If Google Apps Script Web App URL is provided or inputted as spreadsheetId
   const scriptUrl = webAppUrl || (existingSpreadsheetId?.startsWith('https://script.google.com') ? existingSpreadsheetId : undefined);
   if (scriptUrl) {
     const proxyRes = await fetch('/api/sheets-proxy', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ scriptUrl, payload: { values, title: project.title } }),
+      body: JSON.stringify({ scriptUrl, payload: { values: normalizedValues, title: project.title } }),
     });
 
     const proxyData = await proxyRes.json().catch(() => ({}));
@@ -286,7 +301,7 @@ export async function exportToGoogleSheets(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        values,
+        values: normalizedValues,
       }),
     }
   );

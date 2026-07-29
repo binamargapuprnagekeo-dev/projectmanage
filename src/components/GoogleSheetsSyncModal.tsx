@@ -368,7 +368,22 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
     sheet.clear();
     var values = data.values;
     if (values && values.length > 0) {
-      sheet.getRange(1, 1, values.length, values[0].length).setValues(values);
+      var maxCols = 0;
+      for (var i = 0; i < values.length; i++) {
+        if (values[i] && values[i].length > maxCols) {
+          maxCols = values[i].length;
+        }
+      }
+      if (maxCols === 0) maxCols = 1;
+
+      for (var r = 0; r < values.length; r++) {
+        if (!values[r]) values[r] = [];
+        while (values[r].length < maxCols) {
+          values[r].push("");
+        }
+      }
+
+      sheet.getRange(1, 1, values.length, maxCols).setValues(values);
     }
     return ContentService.createTextOutput(JSON.stringify({ status: "success" }))
       .setMimeType(ContentService.MimeType.JSON);
