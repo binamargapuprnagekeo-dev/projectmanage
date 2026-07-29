@@ -14,9 +14,20 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
   onProjectUpdated,
   onClose,
 }) => {
-  const [spreadsheetId, setSpreadsheetId] = useState(
-    project.sheetsConfig?.spreadsheetId || ''
-  );
+  const SAVED_SHEET_URL_KEY = 'kurva_s_google_sheets_url';
+
+  const [spreadsheetId, setSpreadsheetIdState] = useState<string>(() => {
+    return project.sheetsConfig?.spreadsheetId || localStorage.getItem(SAVED_SHEET_URL_KEY) || '';
+  });
+
+  const setSpreadsheetId = (val: string) => {
+    setSpreadsheetIdState(val);
+    if (val && val.trim()) {
+      localStorage.setItem(SAVED_SHEET_URL_KEY, val.trim());
+    } else {
+      localStorage.removeItem(SAVED_SHEET_URL_KEY);
+    }
+  };
   const [accessToken, setAccessToken] = useState('');
   const [showTokenHelp, setShowTokenHelp] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -322,11 +333,13 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
               placeholder="Tempel link Google Sheet Anda di sini (atau biarkan kosong untuk buat sheet baru)"
               className="w-full bg-[#121212] border border-white/20 text-white p-2.5 font-mono text-xs focus:outline-none focus:border-[#C8FF00]"
             />
-            <div className="flex items-center justify-between text-[10px] text-white/50 font-mono">
-              <span>Biarkan kosong jika ingin aplikasi membuatkan Google Spreadsheet baru di Drive.</span>
-              {project.sheetsConfig?.lastSyncedAt && (
-                <span className="text-white/40">Sync: {project.sheetsConfig.lastSyncedAt}</span>
-              )}
+            <div className="flex flex-col gap-1 text-[10px] text-white/60 font-mono">
+              <div className="flex items-center justify-between">
+                <span className="text-[#C8FF00] font-bold">💾 URL ini tersimpan otomatis di browser &amp; diingat untuk seterusnya.</span>
+                {project.sheetsConfig?.lastSyncedAt && (
+                  <span className="text-white/40">Sync: {project.sheetsConfig.lastSyncedAt}</span>
+                )}
+              </div>
             </div>
           </div>
 
