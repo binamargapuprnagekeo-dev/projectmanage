@@ -139,14 +139,28 @@ app.post('/api/sheets-proxy', async (req, res) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
+      redirect: 'follow',
     });
 
     const text = await response.text();
+
+    if (text.includes('<!DOCTYPE html>') || text.includes('Google Accounts') || text.includes('accounts.google.com')) {
+      return res.status(400).json({
+        error: 'Akses ditolak oleh Google. Pastikan setelan pendeploian Google Apps Script diatur ke: "Siapa saja" (Anyone).',
+      });
+    }
+
     let jsonResult;
     try {
       jsonResult = JSON.parse(text);
     } catch (e) {
       jsonResult = { message: text };
+    }
+
+    if (jsonResult && jsonResult.status === 'error') {
+      return res.status(400).json({
+        error: jsonResult.message || 'Google Apps Script mengembalikan pesan error.',
+      });
     }
 
     return res.json({ success: true, result: jsonResult });

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileSpreadsheet, Download, Upload, ExternalLink, RefreshCw, Check, X, AlertCircle } from 'lucide-react';
+import { FileSpreadsheet, Download, Upload, ExternalLink, RefreshCw, CheckCircle2, X, AlertCircle } from 'lucide-react';
 import { ProjectInfo } from '../types/schedule';
 import { exportToGoogleSheets, importFromGoogleSheets } from '../utils/googleSheets';
 
@@ -117,6 +117,7 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
       setStatusMsg('✅ Data Kurva S & Bobot Fisik berhasil diekspor ke Google Sheets!');
     } catch (err: any) {
       console.error('Google Sheets Export error:', err);
+      setStatusMsg('');
       setErrorMsg(err.message || 'Gagal mengekspor data ke Google Sheets.');
     } finally {
       setLoading(false);
@@ -159,8 +160,9 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
         setSpreadsheetId(cleanId);
         setStatusMsg('✅ Progress realisasi berhasil disinkronkan & diimpor dari Google Sheets!');
       } catch (tokenErr: any) {
+        setStatusMsg('');
         setErrorMsg(
-          err.message || 'Gagal membaca Google Sheet. Pastikan spreadsheet disetting: "Siapa saja yang memiliki link dapat melihat" (Anyone with link can view).'
+          err.message || tokenErr.message || 'Gagal membaca Google Sheet. Pastikan spreadsheet disetting: "Siapa saja yang memiliki link dapat melihat" (Anyone with link can view).'
         );
       }
     } finally {
@@ -237,6 +239,7 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
       setStatusMsg('⚡ Sinkronisasi 2 Arah Sukses! Data ditarik dari Sheets & disimpan ulang dengan sempurna.');
     } catch (err: any) {
       console.error('Two-Way Sync error:', err);
+      setStatusMsg('');
       setErrorMsg(err.message || 'Gagal melakukan sinkronisasi dengan Google Sheets.');
     } finally {
       setLoading(false);
@@ -244,10 +247,10 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 font-sans">
-      <div className="bg-[#121212] border border-white/20 shadow-2xl max-w-xl w-full flex flex-col overflow-hidden text-white">
+    <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4 font-sans overflow-y-auto">
+      <div className="bg-[#121212] border border-white/20 shadow-2xl max-w-xl w-full flex flex-col my-auto max-h-[90vh] text-white">
         {/* Header */}
-        <div className="p-4 bg-[#0A0A0A] text-white flex items-center justify-between border-b border-white/10">
+        <div className="p-4 bg-[#0A0A0A] text-white flex items-center justify-between border-b border-white/10 flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="bg-[#C8FF00] p-2 text-black font-black">
               <FileSpreadsheet className="w-5 h-5" />
@@ -263,14 +266,16 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-1 text-white/50 hover:text-white rounded hover:bg-white/10 transition-colors"
+            className="px-2.5 py-1 bg-white/10 hover:bg-rose-600 hover:border-rose-500 border border-white/20 text-white rounded text-xs font-bold transition-colors flex items-center gap-1"
+            title="Tutup Modal"
           >
-            <X className="w-5 h-5" />
+            <span>Tutup</span>
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Body */}
-        <div className="p-5 space-y-4 text-xs">
+        <div className="p-4 sm:p-5 space-y-4 text-xs overflow-y-auto flex-1 min-h-0">
           {/* Authorization Info Box */}
           <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 text-emerald-200 text-[11px] space-y-1.5">
             <div className="font-bold flex items-center gap-1.5 text-[#C8FF00] uppercase tracking-wider text-[11px]">
@@ -302,7 +307,11 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
 
           {statusMsg && (
             <div className="p-3 bg-[#C8FF00]/10 border border-[#C8FF00]/40 text-[#C8FF00] font-bold uppercase tracking-wider flex items-center gap-2 font-mono">
-              <RefreshCw className="w-4 h-4 animate-spin text-[#C8FF00]" />
+              {loading ? (
+                <RefreshCw className="w-4 h-4 animate-spin text-[#C8FF00] flex-shrink-0" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4 text-[#C8FF00] flex-shrink-0" />
+              )}
               <span>{statusMsg}</span>
             </div>
           )}
@@ -447,12 +456,15 @@ function doGet(e) {
         </div>
 
         {/* Footer */}
-        <div className="p-4 bg-[#0A0A0A] border-t border-white/10 flex justify-end">
+        <div className="p-3 sm:p-4 bg-[#0A0A0A] border-t border-white/10 flex items-center justify-between flex-shrink-0">
+          <span className="text-[10px] text-white/40 font-mono hidden sm:inline">
+            Status: {loading ? 'Sedang Memproses...' : 'Siap'}
+          </span>
           <button
             onClick={onClose}
-            className="px-5 py-2 bg-transparent border border-white/20 text-white/80 hover:text-white hover:border-white text-xs font-bold uppercase tracking-wider"
+            className="w-full sm:w-auto px-6 py-2 bg-[#C8FF00] text-black hover:bg-[#b5e600] font-black text-xs uppercase tracking-wider transition-colors shadow-md"
           >
-            Tutup
+            Tutup (Close)
           </button>
         </div>
       </div>

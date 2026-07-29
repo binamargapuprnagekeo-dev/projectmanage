@@ -224,30 +224,16 @@ export async function exportToGoogleSheets(
   // If Google Apps Script Web App URL is provided or inputted as spreadsheetId
   const scriptUrl = webAppUrl || (existingSpreadsheetId?.startsWith('https://script.google.com') ? existingSpreadsheetId : undefined);
   if (scriptUrl) {
-    try {
-      const proxyRes = await fetch('/api/sheets-proxy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scriptUrl, payload: { values, title: project.title } }),
-      });
-
-      if (proxyRes.ok) {
-        return {
-          spreadsheetId: scriptUrl,
-          spreadsheetUrl: scriptUrl,
-        };
-      }
-    } catch (e) {
-      console.warn('Sheets proxy error, falling back to direct POST:', e);
-    }
-
-    // Direct fetch fallback
-    await fetch(scriptUrl, {
+    const proxyRes = await fetch('/api/sheets-proxy', {
       method: 'POST',
-      mode: 'no-cors',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ values, title: project.title }),
+      body: JSON.stringify({ scriptUrl, payload: { values, title: project.title } }),
     });
+
+    const proxyData = await proxyRes.json().catch(() => ({}));
+    if (!proxyRes.ok || proxyData.error) {
+      throw new Error(proxyData.error || 'Gagal menyimpan data ke Google Apps Script Web App.');
+    }
 
     return {
       spreadsheetId: scriptUrl,
