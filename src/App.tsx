@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ProjectInfo, ScheduleItem, Category, UserRole, GoogleSheetsConfig } from './types/schedule';
-import { sampleProjectPicu, sampleProjectCleanroom } from './data/sampleProjects';
+import { sampleProjectPicu, sampleProjectCleanroom, emptyCleanProject } from './data/sampleProjects';
 import {
   recalculateProject,
   calculateWeekSummaries,
@@ -23,7 +23,7 @@ import { ConsultantNoteModal } from './components/ConsultantNoteModal';
 import { ChecklistModal } from './components/ChecklistModal';
 
 export default function App() {
-  const [project, setProject] = useState<ProjectInfo>(sampleProjectPicu);
+  const [project, setProject] = useState<ProjectInfo>(emptyCleanProject);
   const [userRole, setUserRole] = useState<UserRole>('kontraktor');
   const [activeTab, setActiveTab] = useState<'schedule' | 'termin' | 'chart'>('schedule');
   const [isPrintMode, setIsPrintMode] = useState<boolean>(false);
@@ -60,36 +60,15 @@ export default function App() {
 
   // Preset switch
   const handleSelectPreset = (presetKey: string) => {
-    if (presetKey === 'picu-2026') {
+    if (presetKey === 'empty-clean' || presetKey === 'new') {
+      setProject({
+        ...emptyCleanProject,
+        id: `project-${Date.now()}`,
+      });
+    } else if (presetKey === 'picu-2026') {
       setProject(sampleProjectPicu);
     } else if (presetKey === 'cleanroom-2026') {
       setProject(sampleProjectCleanroom);
-    } else if (presetKey === 'new') {
-      const newBlankProject: ProjectInfo = {
-        id: `project-${Date.now()}`,
-        title: 'PROYEK KONSTRUKSI BARU',
-        location: 'Kab. Nagekeo',
-        agency: 'Dinas Pekerjaan Umum',
-        fiscalYear: '2026',
-        durationDays: 150,
-        durationMonths: 5,
-        weeksPerMonth: 4,
-        totalWeeks: 20,
-        bidderName: 'CV. KONTRAKTOR UTAMA',
-        directorName: 'DIREKTUR PROYEK',
-        directorTitle: 'Kuasa Direktur',
-        cityDate: 'Mbay, 01 Juli 2026',
-        currentWeek: 1,
-        categories: [
-          {
-            id: 'c-1',
-            code: 'I',
-            name: 'PEKERJAAN PERSIAPAN',
-            items: [],
-          },
-        ],
-      };
-      setProject(newBlankProject);
     }
   };
 

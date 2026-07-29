@@ -1,6 +1,24 @@
 import { ProjectInfo } from '../types/schedule';
 import { recalculateProject } from '../utils/calculator';
 
+export const emptyCleanProject: ProjectInfo = recalculateProject({
+  id: 'empty-clean',
+  title: 'PROYEK KONSTRUKSI BARU',
+  location: '-',
+  agency: '-',
+  fiscalYear: '2026',
+  durationDays: 120,
+  durationMonths: 4,
+  weeksPerMonth: 4,
+  totalWeeks: 16,
+  bidderName: '-',
+  directorName: '-',
+  directorTitle: 'Kuasa Direktur',
+  cityDate: 'Mbay, 01 Juli 2026',
+  currentWeek: 1,
+  categories: [],
+});
+
 export const sampleProjectPicu: ProjectInfo = recalculateProject({
   id: 'picu-2026',
   title: 'PEMBANGUNAN GEDUNG PICU',

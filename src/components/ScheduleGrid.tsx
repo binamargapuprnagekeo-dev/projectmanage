@@ -193,6 +193,33 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
           </thead>
 
           <tbody>
+            {project.categories.length === 0 && (
+              <tr>
+                <td colSpan={7 + project.totalWeeks} className="py-12 text-center bg-[#0D0D0D]">
+                  <div className="flex flex-col items-center justify-center space-y-3 max-w-md mx-auto">
+                    <div className="w-12 h-12 bg-white/5 border border-white/10 flex items-center justify-center text-[#C8FF00]">
+                      <Plus className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h4 className="font-syne font-black text-white text-base uppercase tracking-wide">
+                        Aplikasi Dalam Keadaan Kosong (Bersih)
+                      </h4>
+                      <p className="text-xs text-white/50 mt-1">
+                        Belum ada data pekerjaan. Silakan klik tombol di bawah untuk menambah item RAB atau impor data dari Google Sheets / Excel / JSON.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => onAddItemToCategory('')}
+                      className="px-4 py-2 bg-[#C8FF00] text-black font-black text-xs uppercase tracking-wider flex items-center gap-2 hover:bg-[#b5e600] transition-all shadow-lg"
+                    >
+                      <Plus className="w-4 h-4 stroke-[2.5]" />
+                      Tambah Item Pekerjaan Baru
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            )}
+
             {project.categories.map((cat) => {
               const isCollapsed = collapsedCategories[cat.id];
               const categoryTotal = cat.items.reduce(

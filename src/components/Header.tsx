@@ -11,6 +11,7 @@ import {
   DollarSign,
   Layers,
   UserCheck,
+  Trash2,
 } from 'lucide-react';
 import { ProjectInfo, UserRole } from '../types/schedule';
 import { RoleSelector } from './RoleSelector';
@@ -85,10 +86,23 @@ export const Header: React.FC<HeaderProps> = ({
               onChange={(e) => onSelectPreset(e.target.value)}
               className="bg-[#121212] border border-white/20 text-white text-xs font-semibold px-2 py-1 focus:outline-none focus:border-[#C8FF00]"
             >
-              <option value="picu-2026">1. Gedung PICU (Rp 882,3 Jt)</option>
-              <option value="cleanroom-2026">2. Arsitektur Cleanroom (Rp 844,1 Jt)</option>
-              <option value="new">3. + Buat Proyek Baru</option>
+              <option value="empty-clean">✨ Proyek Bersih (Kosong)</option>
+              <option value="picu-2026">📁 Contoh: Gedung PICU (Rp 882,3 Jt)</option>
+              <option value="cleanroom-2026">📁 Contoh: Arsitektur Cleanroom (Rp 844,1 Jt)</option>
             </select>
+
+            <button
+              onClick={() => {
+                if (window.confirm('Apakah Anda yakin ingin mengosongkan seluruh data proyek?')) {
+                  onSelectPreset('empty-clean');
+                }
+              }}
+              className="px-2 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 transition-all"
+              title="Kosongkan Seluruh Data Pekerjaan"
+            >
+              <Trash2 className="w-3 h-3 text-rose-400" />
+              <span>Kosongkan Data</span>
+            </button>
           </div>
         </div>
 
