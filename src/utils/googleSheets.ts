@@ -247,7 +247,7 @@ export async function exportToGoogleSheets(
         payload: {
           values: normalizedValues,
           title: project.title,
-          spreadsheetId: '1R7pwxSWyPi5kh01kaI8OKXP5a7hHfGY2hBdBoiR2cIo',
+          spreadsheetId: '1MBMa_C5sJ2TRYDJ0gUcyHR06PmeffLAoi9f6f3NizCg',
         },
       }),
     });

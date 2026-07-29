@@ -15,7 +15,7 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
   onClose,
 }) => {
   const SAVED_SHEET_URL_KEY = 'kurva_s_google_sheets_url';
-  const DEFAULT_SPREADSHEET_ID = '1R7pwxSWyPi5kh01kaI8OKXP5a7hHfGY2hBdBoiR2cIo';
+  const DEFAULT_SPREADSHEET_ID = '1MBMa_C5sJ2TRYDJ0gUcyHR06PmeffLAoi9f6f3NizCg';
 
   const [spreadsheetId, setSpreadsheetIdState] = useState<string>(() => {
     return project.sheetsConfig?.spreadsheetId || localStorage.getItem(SAVED_SHEET_URL_KEY) || DEFAULT_SPREADSHEET_ID;
@@ -368,7 +368,7 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
     if (ss) return ss.getActiveSheet();
   } catch(e) {}
   
-  var targetId = (data && data.spreadsheetId) ? data.spreadsheetId : "1R7pwxSWyPi5kh01kaI8OKXP5a7hHfGY2hBdBoiR2cIo";
+  var targetId = (data && data.spreadsheetId) ? data.spreadsheetId : "1MBMa_C5sJ2TRYDJ0gUcyHR06PmeffLAoi9f6f3NizCg";
   if (targetId.indexOf("/d/") !== -1) {
     targetId = targetId.split("/d/")[1].split("/")[0];
   }

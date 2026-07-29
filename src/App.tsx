@@ -38,7 +38,7 @@ export default function App() {
       console.warn('Gagal memuat project dari localStorage:', e);
     }
 
-    const DEFAULT_SPREADSHEET_ID = '1R7pwxSWyPi5kh01kaI8OKXP5a7hHfGY2hBdBoiR2cIo';
+    const DEFAULT_SPREADSHEET_ID = '1MBMa_C5sJ2TRYDJ0gUcyHR06PmeffLAoi9f6f3NizCg';
     const savedSheetUrl = localStorage.getItem(SAVED_SHEET_URL_KEY) || DEFAULT_SPREADSHEET_ID;
     if (savedSheetUrl) {
       initialProject = {
@@ -107,6 +107,8 @@ export default function App() {
         ? updatedProject.sheetsConfig.spreadsheetId
         : localStorage.getItem(SAVED_SHEET_URL_KEY)?.startsWith('https://script.google.com')
         ? localStorage.getItem(SAVED_SHEET_URL_KEY)
+        : localStorage.getItem('kurva_s_apps_script_url')?.startsWith('https://script.google.com')
+        ? localStorage.getItem('kurva_s_apps_script_url')
         : null;
 
     if (!scriptUrl) return;
