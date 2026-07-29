@@ -2,12 +2,62 @@ import { ProjectInfo } from '../types/schedule';
 import { calculateWeekSummaries, formatCurrency, isItemCriticalPath } from './calculator';
 
 /**
+ * Parse CSV string into 2D string array handling quoted commas and newlines.
+ */
+export function parseCSV(csvText: string): string[][] {
+  const lines: string[][] = [];
+  let row: string[] = [];
+  let inQuotes = false;
+  let currentToken = '';
+
+  for (let i = 0; i < csvText.length; i++) {
+    const char = csvText[i];
+    const nextChar = csvText[i + 1];
+
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        currentToken += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ',' && !inQuotes) {
+      row.push(currentToken.trim());
+      currentToken = '';
+    } else if ((char === '\r' || char === '\n') && !inQuotes) {
+      if (char === '\r' && nextChar === '\n') {
+        i++;
+      }
+      row.push(currentToken.trim());
+      currentToken = '';
+      if (row.some((cell) => cell.length > 0)) {
+        lines.push(row);
+      }
+      row = [];
+    } else {
+      currentToken += char;
+    }
+  }
+
+  if (currentToken.length > 0 || row.length > 0) {
+    row.push(currentToken.trim());
+    if (row.some((cell) => cell.length > 0)) {
+      lines.push(row);
+    }
+  }
+
+  return lines;
+}
+
+/**
  * Creates or updates a Google Spreadsheet with Kurva S schedule and progress data.
+ * Supports both Google Apps Script Web App URLs (no login required) and Google Sheets API v4.
  */
 export async function exportToGoogleSheets(
   project: ProjectInfo,
-  accessToken: string,
-  existingSpreadsheetId?: string
+  accessToken?: string,
+  existingSpreadsheetId?: string,
+  webAppUrl?: string
 ): Promise<{ spreadsheetId: string; spreadsheetUrl: string }> {
   const weekSummaries = calculateWeekSummaries(project);
   
@@ -171,7 +221,31 @@ export async function exportToGoogleSheets(
     ...weekSummaries.map((s) => s.deviationCumulative),
   ]);
 
+  // If Google Apps Script Web App URL is provided or inputted as spreadsheetId
+  const scriptUrl = webAppUrl || (existingSpreadsheetId?.startsWith('https://script.google.com') ? existingSpreadsheetId : undefined);
+  if (scriptUrl) {
+    const scriptRes = await fetch(scriptUrl, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ values, title: project.title }),
+    });
+    return {
+      spreadsheetId: scriptUrl,
+      spreadsheetUrl: scriptUrl,
+    };
+  }
+
   let spreadsheetId = existingSpreadsheetId;
+  if (spreadsheetId && spreadsheetId.includes('/d/')) {
+    spreadsheetId = spreadsheetId.split('/d/')[1].split('/')[0];
+  }
+
+  if (!accessToken) {
+    throw new Error(
+      'Diperlukan Google Apps Script Web App URL atau Access Token untuk menyimpan data secara otomatis ke Google Sheets.'
+    );
+  }
 
   if (!spreadsheetId) {
     // Create new spreadsheet via Google Sheets API v4
@@ -197,7 +271,7 @@ export async function exportToGoogleSheets(
     spreadsheetId = createData.spreadsheetId;
   }
 
-  // Update cell values
+  // Update cell values via Google Sheets API v4
   const updateRes = await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Sheet1!A1?valueInputOption=USER_ENTERED`,
     {
@@ -227,41 +301,69 @@ export async function exportToGoogleSheets(
 
 /**
  * Reads weekly actual values from a Google Spreadsheet ID and updates the project state.
+ * First attempts public CSV fetch (works for any public sheet without API key/OAuth).
+ * If that fails, falls back to Google Sheets API v4 with token.
  */
 export async function importFromGoogleSheets(
-  spreadsheetId: string,
-  accessToken: string,
+  spreadsheetIdInput: string,
+  accessToken: string | undefined,
   currentProject: ProjectInfo
 ): Promise<ProjectInfo> {
-  const range = 'Sheet1!A1:ZZ500';
-  const fetchRes = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}`,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    }
-  );
-
-  if (!fetchRes.ok) {
-    const errJson = await fetchRes.json();
-    throw new Error(errJson.error?.message || 'Gagal membaca Google Spreadsheet.');
+  let cleanId = spreadsheetIdInput.trim();
+  if (cleanId.includes('/d/')) {
+    cleanId = cleanId.split('/d/')[1].split('/')[0];
   }
 
-  const data = await fetchRes.json();
-  const rows: any[][] = data.values || [];
+  let rows: string[][] = [];
+
+  // Try 1: Public CSV Export endpoint (No OAuth or API Key required!)
+  try {
+    const csvUrl = `https://docs.google.com/spreadsheets/d/${cleanId}/gviz/tq?tqx=out:csv`;
+    const csvRes = await fetch(csvUrl);
+    if (csvRes.ok) {
+      const csvText = await csvRes.text();
+      if (csvText && !csvText.includes('<!DOCTYPE html>')) {
+        rows = parseCSV(csvText);
+      }
+    }
+  } catch (err) {
+    console.warn('Public CSV fetch failed, trying API fallback...', err);
+  }
+
+  // Try 2: Google Sheets API v4 fallback (if public fetch failed or returned HTML)
+  if (rows.length === 0 && accessToken) {
+    const range = 'Sheet1!A1:ZZ500';
+    const fetchRes = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${cleanId}/values/${encodeURIComponent(range)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    if (fetchRes.ok) {
+      const data = await fetchRes.json();
+      rows = data.values || [];
+    } else {
+      const errJson = await fetchRes.json();
+      throw new Error(errJson.error?.message || 'Gagal membaca Google Spreadsheet.');
+    }
+  }
 
   if (rows.length === 0) {
-    throw new Error('Google Spreadsheet kosong atau format tidak sesuai.');
+    throw new Error(
+      'Gagal membaca Google Spreadsheet. Pastikan Google Sheet Anda disetting: "Siapa saja yang memiliki link dapat melihat" (Anyone with link can view).'
+    );
   }
 
   // Find header row (starts with NO and URAIAN PEKERJAAN)
   const headerIndex = rows.findIndex(
-    (r) => r && r[0] === 'NO' && r[1] && String(r[1]).includes('URAIAN')
+    (r) => r && r[0] && String(r[0]).trim().toUpperCase() === 'NO' && r[1] && String(r[1]).toUpperCase().includes('URAIAN')
   );
 
   if (headerIndex === -1) {
-    throw new Error('Header tabel Kurva S tidak ditemukan di Google Spreadsheet.');
+    throw new Error('Header tabel Kurva S (NO, URAIAN PEKERJAAN, M1, M2...) tidak ditemukan di Google Spreadsheet.');
   }
 
   const headerRow = rows[headerIndex];
@@ -333,8 +435,8 @@ export async function importFromGoogleSheets(
     categories: updatedCategories,
     sheetsConfig: {
       ...currentProject.sheetsConfig,
-      spreadsheetId,
-      spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`,
+      spreadsheetId: cleanId,
+      spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${cleanId}/edit`,
       lastSyncedAt: new Date().toLocaleString('id-ID'),
     },
   };

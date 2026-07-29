@@ -25,29 +25,32 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
   );
 
   const getAccessToken = async (): Promise<string> => {
-    // If running in Google AI Studio sandbox with OAuth granted, get token or ask user
-    // We try to request GIS token client or prompt
     return new Promise((resolve, reject) => {
       if (typeof window !== 'undefined' && (window as any).google?.accounts?.oauth2) {
         const tokenClient = (window as any).google.accounts.oauth2.initTokenClient({
-          client_id: '1029272332612-placeholder.apps.googleusercontent.com', // fallback
+          client_id: '1029272332612-placeholder.apps.googleusercontent.com',
           scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file',
           callback: (response: any) => {
             if (response.access_token) {
               resolve(response.access_token);
             } else {
-              reject(new Error('Gagal mendapatkan token OAuth Google.'));
+              reject(new Error('Akses Google Sheets ditolak. Pastikan memberikan izin saat pop-up OAuth muncul.'));
             }
           },
         });
         tokenClient.requestAccessToken();
       } else {
-        // Fallback: prompt for user token or use proxy
-        const manualToken = prompt('OAuth Token Google Sheets telah aktif. Silakan masukkan Access Token Google Anda (opsional) atau klik OK untuk memproses:');
-        if (manualToken !== null) {
-          resolve(manualToken);
+        const manualToken = prompt(
+          'Gunakan Google OAuth Access Token untuk menyambung ke Google Sheets API.\n\nJika belum ada token, masukkan token Anda atau klik Batal untuk menggunakan opsi Impor/Ekspor Excel (.xlsx) gratis yang tidak memerlukan izin:'
+        );
+        if (manualToken && manualToken.trim()) {
+          resolve(manualToken.trim());
         } else {
-          reject(new Error('Batal memilih token.'));
+          reject(
+            new Error(
+              'Akses Google Sheets membutuhkan Access Token valid dari Google.\n\nTips: Anda juga bisa memakai fitur "Ekspor Excel / JSON" di header jika ingin langsung membuka file di Google Sheets tanpa perlu izin API!'
+            )
+          );
         }
       }
     });
@@ -92,25 +95,39 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
     }
 
     setLoading(true);
-    setStatusMsg('Membaca realisasi fisik dari Google Sheets...');
+    setStatusMsg('Membaca data & realisasi fisik langsung dari Google Sheets...');
     setErrorMsg('');
 
     try {
-      // Extract clean ID if full URL pasted
       let cleanId = spreadsheetId.trim();
       if (cleanId.includes('/d/')) {
         cleanId = cleanId.split('/d/')[1].split('/')[0];
       }
 
-      const token = await getAccessToken();
-      const updatedProj = await importFromGoogleSheets(cleanId, token, project);
+      // Try importing without token first (using public CSV)
+      const updatedProj = await importFromGoogleSheets(cleanId, undefined, project);
 
       onProjectUpdated(updatedProj);
       setSpreadsheetId(cleanId);
       setStatusMsg('✅ Progress realisasi berhasil disinkronkan & diimpor dari Google Sheets!');
     } catch (err: any) {
       console.error('Google Sheets Import error:', err);
-      setErrorMsg(err.message || 'Gagal mengimpor data dari Google Sheets.');
+      // If public CSV failed, ask for optional access token fallback
+      try {
+        let cleanId = spreadsheetId.trim();
+        if (cleanId.includes('/d/')) {
+          cleanId = cleanId.split('/d/')[1].split('/')[0];
+        }
+        const token = await getAccessToken();
+        const updatedProj = await importFromGoogleSheets(cleanId, token, project);
+        onProjectUpdated(updatedProj);
+        setSpreadsheetId(cleanId);
+        setStatusMsg('✅ Progress realisasi berhasil disinkronkan & diimpor dari Google Sheets!');
+      } catch (tokenErr: any) {
+        setErrorMsg(
+          err.message || 'Gagal membaca Google Sheet. Pastikan spreadsheet disetting: "Siapa saja yang memiliki link dapat melihat" (Anyone with link can view).'
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -192,6 +209,20 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
 
         {/* Body */}
         <div className="p-5 space-y-4 text-xs">
+          {/* Authorization Info Box */}
+          <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 text-emerald-200 text-[11px] space-y-1.5">
+            <div className="font-bold flex items-center gap-1.5 text-[#C8FF00] uppercase tracking-wider text-[11px]">
+              <AlertCircle className="w-4 h-4 text-[#C8FF00]" />
+              <span>Sistem Integrasi Link Google Sheets</span>
+            </div>
+            <p className="leading-relaxed text-white/90">
+              🟢 <strong>Membaca &amp; Tarik Progress (Bebas Izin/Login):</strong> Cukup bagikan Google Spreadsheet Anda dengan setelan <em>&quot;Siapa saja yang memiliki link dapat melihat&quot;</em>. Siapa pun bisa menempelkan link dan klik <strong>&quot;Tarik / Impor Dari Sheets&quot;</strong> tanpa perlunya login atau OAuth.
+            </p>
+            <p className="leading-relaxed text-white/80">
+              ⚡ <strong>Simpan / Ekspor Ke Sheets:</strong> Membutuhkan kredenasi Access Token Google API. Sebagai alternatif langsung, Anda juga bisa klik menu <strong>&quot;EKSPOR EXCEL (.XLSX)&quot;</strong> di header untuk mengunduh dan membuka file langsung di Google Sheets.
+            </p>
+          </div>
+
           {errorMsg && (
             <div className="p-3 bg-rose-950/80 border border-rose-500/40 text-rose-300 font-bold uppercase tracking-wider flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
