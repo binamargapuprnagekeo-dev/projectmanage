@@ -49,16 +49,7 @@ export function parseCSV(csvText: string): string[][] {
   return lines;
 }
 
-/**
- * Creates or updates a Google Spreadsheet with Kurva S schedule and progress data.
- * Supports both Google Apps Script Web App URLs (no login required) and Google Sheets API v4.
- */
-export async function exportToGoogleSheets(
-  project: ProjectInfo,
-  accessToken?: string,
-  existingSpreadsheetId?: string,
-  webAppUrl?: string
-): Promise<{ spreadsheetId: string; spreadsheetUrl: string }> {
+export function buildProjectMatrixValues(project: ProjectInfo): any[][] {
   const weekSummaries = calculateWeekSummaries(project);
   
   // Calculate Grand Total
@@ -228,13 +219,57 @@ export async function exportToGoogleSheets(
   });
   if (maxCols === 0) maxCols = 1;
 
-  const normalizedValues = values.map((row) => {
+  return values.map((row) => {
     const padded = [...row];
     while (padded.length < maxCols) {
       padded.push('');
     }
     return padded;
   });
+}
+
+/**
+ * Generate Tab-Separated Values string for direct pasting into Google Sheets
+ */
+export function generateTSVForGoogleSheets(project: ProjectInfo): string {
+  const matrix = buildProjectMatrixValues(project);
+  return matrix
+    .map((row) =>
+      row
+        .map((cell) => {
+          if (cell === null || cell === undefined) return '';
+          return String(cell).replace(/\t/g, ' ').replace(/\r?\n/g, ' ');
+        })
+        .join('\t')
+    )
+    .join('\n');
+}
+
+/**
+ * Copy formatted Kurva S matrix directly to system clipboard
+ */
+export async function copyProjectMatrixToClipboard(project: ProjectInfo): Promise<boolean> {
+  const tsv = generateTSVForGoogleSheets(project);
+  try {
+    await navigator.clipboard.writeText(tsv);
+    return true;
+  } catch (err) {
+    console.error('Failed to copy matrix to clipboard:', err);
+    return false;
+  }
+}
+
+/**
+ * Creates or updates a Google Spreadsheet with Kurva S schedule and progress data.
+ * Supports both Google Apps Script Web App URLs (no login required) and Google Sheets API v4.
+ */
+export async function exportToGoogleSheets(
+  project: ProjectInfo,
+  accessToken?: string,
+  existingSpreadsheetId?: string,
+  webAppUrl?: string
+): Promise<{ spreadsheetId: string; spreadsheetUrl: string }> {
+  const normalizedValues = buildProjectMatrixValues(project);
 
   // If Google Apps Script Web App URL is provided or inputted as spreadsheetId
   const scriptUrl = webAppUrl || (existingSpreadsheetId?.startsWith('https://script.google.com') ? existingSpreadsheetId : undefined);
