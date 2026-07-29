@@ -155,26 +155,26 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Action Buttons */}
         <div className="flex items-center flex-wrap gap-2">
-          {/* Google Sheets Sync */}
+          {/* Google Sheets Status & Auto-Save Indicator */}
           <button
             onClick={onOpenGoogleSheetsModal}
-            className="flex items-center gap-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 text-xs px-3 py-1.5 font-bold uppercase tracking-wider transition-all"
-            title="Simpan & Sync Google Sheets"
+            className="flex items-center gap-1.5 bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-500/50 text-xs px-3 py-1.5 font-bold uppercase tracking-wider transition-all"
+            title="Buka Database & Link Google Sheets"
           >
             {autoSyncStatus?.isSyncing ? (
               <>
                 <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#C8FF00]" />
-                <span className="text-[#C8FF00]">Auto-Syncing...</span>
+                <span className="text-[#C8FF00]">Menyimpan Data...</span>
               </>
             ) : autoSyncStatus?.lastSyncedAt ? (
               <>
                 <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Google Sheets <span className="text-[#C8FF00] font-mono text-[10px] lowercase">(sync {autoSyncStatus.lastSyncedAt})</span></span>
+                <span>GOOGLE SHEETS <span className="text-[#C8FF00] font-mono text-[10px] lowercase">(tersimpan {autoSyncStatus.lastSyncedAt})</span></span>
               </>
             ) : (
               <>
                 <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Google Sheets</span>
+                <span>GOOGLE SHEETS (AUTOSAVE)</span>
               </>
             )}
           </button>

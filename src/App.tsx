@@ -90,6 +90,8 @@ export default function App() {
 
   // Auto-Save to LocalStorage & Auto-Sync to Google Sheets upon ANY input/change
   useEffect(() => {
+    const nowTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    
     // 1. Save to LocalStorage immediately
     try {
       localStorage.setItem(LOCAL_STORAGE_PROJECT_KEY, JSON.stringify(updatedProject));
@@ -111,6 +113,13 @@ export default function App() {
         ? localStorage.getItem('kurva_s_apps_script_url')
         : null;
 
+    // Always update status so user sees real-time auto-save
+    setAutoSyncStatus({
+      isSyncing: false,
+      lastSyncedAt: nowTime,
+      error: null,
+    });
+
     if (!scriptUrl) return;
 
     // Build payload hash for change checking
@@ -128,26 +137,25 @@ export default function App() {
     // Set syncing status
     setAutoSyncStatus((prev) => ({ ...prev, isSyncing: true, error: null }));
 
-    // Debounce background sync (1.5 seconds after user stops editing)
+    // Debounce background sync (1 second after user stops editing)
     const timer = setTimeout(async () => {
       try {
         await exportToGoogleSheets(updatedProject, undefined, scriptUrl, scriptUrl);
         lastSyncedPayloadRef.current = payloadToSync;
-        const nowTime = new Date().toLocaleTimeString('id-ID');
         setAutoSyncStatus({
           isSyncing: false,
-          lastSyncedAt: nowTime,
+          lastSyncedAt: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
           error: null,
         });
       } catch (err: any) {
         console.warn('Auto-sync Google Sheets failed:', err);
         setAutoSyncStatus({
           isSyncing: false,
-          lastSyncedAt: null,
+          lastSyncedAt: nowTime,
           error: err.message || 'Gagal auto-sync ke Google Sheets.',
         });
       }
-    }, 1500);
+    }, 1000);
 
     return () => clearTimeout(timer);
   }, [updatedProject]);

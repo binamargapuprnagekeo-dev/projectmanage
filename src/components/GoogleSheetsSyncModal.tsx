@@ -176,10 +176,10 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
           <div className="p-3.5 bg-[#0A0A0A] border border-white/15 space-y-2">
             <div className="font-bold text-white uppercase text-[11px] tracking-wider flex items-center gap-1.5">
               <Copy className="w-4 h-4 text-[#C8FF00]" />
-              <span>SALIN TABEL KE GOOGLE SHEETS (1-KLIK)</span>
+              <span>SALIN SELURUH DATA PEKERJAAN (1-KLIK)</span>
             </div>
             <p className="text-[10.5px] text-white/70 leading-relaxed">
-              Jika tabel di Google Sheets masih kosong, klik tombol di bawah untuk menyalin seluruh baris, kolom, dan bobot fisik Kurva S, lalu buka Google Sheets dan tekan <strong>Ctrl+V</strong> di Cell A1:
+              Klik tombol di bawah untuk menyalin seluruh baris pekerjaan, volume, harga, bobot %, jadwal mingguan &amp; realisasi ke clipboard. Kemudian buka Google Sheets dan tekan <strong className="text-white">Ctrl+V</strong> di Cell A1:
             </p>
 
             <button
@@ -188,18 +188,18 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
               className={`w-full py-2.5 px-3 border font-black uppercase text-xs tracking-wider flex items-center justify-center gap-2 transition-all ${
                 copied
                   ? 'bg-emerald-500 border-emerald-400 text-black'
-                  : 'bg-white/10 hover:bg-white/20 border-white/20 text-white'
+                  : 'bg-[#C8FF00] hover:bg-[#b5e600] border-[#C8FF00] text-black shadow-lg'
               }`}
             >
               {copied ? (
                 <>
                   <Check className="w-4 h-4 text-black stroke-[3]" />
-                  <span>BERHASIL DISALIN! SEKARANG PASTE (CTRL+V) DI GOOGLE SHEETS</span>
+                  <span>BERHASIL DISALIN! PASTE (CTRL+V) DI CELL A1 GOOGLE SHEETS</span>
                 </>
               ) : (
                 <>
-                  <Copy className="w-4 h-4 text-[#C8FF00]" />
-                  <span>SALIN SELURUH TABEL MATRIKS KURVA S</span>
+                  <Copy className="w-4 h-4 text-black stroke-[2.5]" />
+                  <span>SALIN MATRIKS LENGKAP KE CLIPBOARD (CTRL+V)</span>
                 </>
               )}
             </button>
